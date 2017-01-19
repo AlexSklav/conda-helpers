@@ -1,0 +1,7 @@
+include RELEASE-VERSION
+include version.py
+include setup.py
+include paver-minilib.zip
+recursive-include conda_helpers *
+recursive-exclude conda_helpers *.pyc
+recursive-exclude conda_helpers *~
