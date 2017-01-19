@@ -10,7 +10,6 @@ dist/*
 *~
 *.*~
 paver-minilib.zip
-setup.py
 *.pyc
 docs/_*
 .ipynb_checkpoints/*
