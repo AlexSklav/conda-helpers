@@ -255,3 +255,40 @@ def conda_version_info(package_name, channels=None):
     installed_version = (None if not installed_indexes
                          else versions[installed_indexes[0]])
     return {'installed': installed_version, 'versions': versions}
+
+
+def conda_exec(*args, **kwargs):
+    '''
+    Execute command using ``conda`` executable in active Conda environment.
+
+    Parameters
+    ----------
+    *args : list(str)
+        Command line arguments to pass to ``conda`` executable.
+
+    Returns
+    -------
+    str
+        Output from command (both ``stdout`` and ``stderr``).
+    '''
+    verbose = kwargs.get('verbose')
+
+    # Running in a Conda environment.
+    process = sp.Popen(conda_activate_command() + ['&', 'conda'] + list(args),
+                       shell=True, stdout=sp.PIPE, stderr=sp.STDOUT)
+    lines = []
+    ostream = sys.stdout
+
+    # Iterate until end of `stdout` stream (i.e., `b''`).
+    for stdout_i in iter(process.stdout.readline, b''):
+        if verbose is None:
+            ostream.write('.')
+        elif verbose:
+            ostream.write(stdout_i)
+        lines.append(stdout_i)
+    process.wait()
+    print >> ostream, ''
+    output = ''.join(lines)
+    if process.returncode != 0:
+        raise RuntimeError(output)
+    return output
