@@ -7,26 +7,13 @@ import re
 import subprocess as sp
 import sys
 
+import logging_helpers as lh
 import path_helpers as ph
-
-
-@contextlib.contextmanager
-def logging_restore():
-    '''
-    Save logging state upon entering context and restore upon leaving.
-    '''
-    handlers = logging.root.handlers[:]
-    level = logging.root.getEffectiveLevel()
-    yield
-    handlers_to_remove = logging.root.handlers[:]
-    [logging.root.removeHandler(h) for h in handlers_to_remove]
-    [logging.root.addHandler(h) for h in handlers]
-    logging.root.setLevel(level)
 
 
 # Import within `logging_restore` context to prevent Conda from clobbering
 # active `logging` settings.
-with logging_restore():
+with lh.logging_restore():
     import conda.cli.main_list
 
 
