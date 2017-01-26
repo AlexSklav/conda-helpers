@@ -7,6 +7,7 @@ import platform
 import re
 import subprocess as sp
 import sys
+import types
 
 import path_helpers as ph
 
@@ -308,17 +309,25 @@ def package_version(name):
     '''
     Parameters
     ----------
-    name : str
-        Name of installed Conda package.
+    name : str or list
+        Name(s) of installed Conda package.
 
     Returns
     -------
-    dict
-        Dictionary containing ``'name'``, ``'version'``, ``'features'``,
-        ``'features'``, and ``'build'``.
+    dict or list
+        Dictionary (or dictionaries) containing ``'name'``, ``'version'``,
+        ``'features'``, ``'features'``, and ``'build'``.
+
+        If multiple package names were specified in :data:`name` argument, the
+        order of the list of version dictionaries is the same as the order of
+        the package names in the :data:`name` argument.
     '''
+    singleton = isinstance(name, types.StringTypes)
+    if singleton:
+        name = [name]
+
     # Use `conda_exec` since
-    versions_js = conda_exec('list', '--full-name', '--json', name)
+    versions_js = conda_exec('list', '--json', '^({})$'.format('|'.join(name)))
     versions = json.loads(versions_js)
     if not versions:
         raise NameError('Package `{}` not installed.'.format(name))
@@ -327,6 +336,20 @@ def package_version(name):
                                     r'(?P<version>[^\-]+)-'
                                     r'((?P<features>[^_]+)_)?'
                                     r'(?P<build>\d+)')
-    version = cre_pkg_descriptor.match(versions[0]).groupdict()
-    version['build'] = int(version['build'])
-    return version
+    version_dicts = [cre_pkg_descriptor.match(v_i).groupdict()
+                     for v_i in versions]
+
+    for version_i in version_dicts:
+        version_i['build'] = int(version_i['build'])
+
+    if singleton:
+        return version_dicts[0]
+    else:
+        # Return list of version dictionaries in same order as names where
+        # specified in `name` argument.
+        versions_dict = dict([(version_i['name'], version_i)
+                              for version_i in version_dicts])
+        for name_i in name:
+            if name_i not in versions_dict:
+                raise NameError('Package `{}` not installed.'.format(name_i))
+        return [versions_dict[name_i] for name_i in name]
