@@ -1,20 +1,12 @@
-import contextlib
 import itertools as it
-import logging
+import json
 import os
 import pkg_resources
 import re
 import subprocess as sp
 import sys
 
-import logging_helpers as lh
 import path_helpers as ph
-
-
-# Import within `logging_restore` context to prevent Conda from clobbering
-# active `logging` settings.
-with lh.logging_restore():
-    import conda.cli.main_list
 
 
 def f_major_version(version):
@@ -313,17 +305,19 @@ def package_version(name):
     Returns
     -------
     dict
-        Dictionary containing ``'name'``, ``'version'``, and ``'build'``.
+        Dictionary containing ``'name'``, ``'version'``, ``'features'``,
+        ``'features'``, and ``'build'``.
     '''
-    prefix = conda_prefix()
-    installed_pkgs = conda.cli.main_list.linked(prefix)
-    exitcode, output = (conda.cli.main_list
-                        .list_packages(prefix, installed_pkgs,
-                                       regex=r'^%s$' % name,
-                                       show_channel_urls=False,
-                                       format='human'))
-    if not output:
+    # Use `conda_exec` since
+    versions_js = conda_exec('list', '--full-name', '--json', name)
+    versions = json.loads(versions_js)
+    if not versions:
         raise NameError('Package `{}` not installed.'.format(name))
-    return [dict(zip(['name', 'version', 'build'], re.split(r'\s+',
-                                                            line_i)[:3]))
-            for line_i in output][0]
+
+    cre_pkg_descriptor = re.compile(r'((?P<channel>.*?)::)?(?P<name>.+)-'
+                                    r'(?P<version>[^\-]+)-'
+                                    r'((?P<features>[^_]+)_)?'
+                                    r'(?P<build>\d+)')
+    version = cre_pkg_descriptor.match(versions[0]).groupdict()
+    version['build'] = int(version['build'])
+    return version
