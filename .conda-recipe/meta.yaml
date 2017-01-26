@@ -27,3 +27,7 @@ requirements:
   run:
     - path_helpers
     - python 2.7*
+
+test:
+  imports:
+    - conda_helpers
