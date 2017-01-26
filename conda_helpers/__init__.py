@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import pkg_resources
+import platform
 import re
 import subprocess as sp
 import sys
@@ -275,6 +276,10 @@ def conda_exec(*args, **kwargs):
         Output from command (both ``stdout`` and ``stderr``).
     '''
     verbose = kwargs.get('verbose')
+
+    escape_char = '^' if platform.system() == 'Windows' else '\\'
+    args = [re.sub(r'([&\\<>\^|])', r'{}\1'.format(escape_char), arg_i)
+            for arg_i in args]
 
     # Running in a Conda environment.
     command = conda_activate_command() + ['&', 'conda'] + list(args)
