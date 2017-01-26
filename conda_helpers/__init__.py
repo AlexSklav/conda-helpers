@@ -1,21 +1,17 @@
-import contextlib
 import itertools as it
+import json
 import logging
 import os
 import pkg_resources
+import platform
 import re
 import subprocess as sp
 import sys
+import types
 
-import logging_helpers as lh
 import path_helpers as ph
 
-
-# Import within `logging_restore` context to prevent Conda from clobbering
-# active `logging` settings.
-with lh.logging_restore():
-    import conda.cli.main_list
-
+logger = logging.getLogger(__name__)
 
 def f_major_version(version):
     '''
@@ -282,9 +278,14 @@ def conda_exec(*args, **kwargs):
     '''
     verbose = kwargs.get('verbose')
 
+    escape_char = '^' if platform.system() == 'Windows' else '\\'
+    args = [re.sub(r'([&\\<>\^|])', r'{}\1'.format(escape_char), arg_i)
+            for arg_i in args]
+
     # Running in a Conda environment.
-    process = sp.Popen(conda_activate_command() + ['&', 'conda'] + list(args),
-                       shell=True, stdout=sp.PIPE, stderr=sp.STDOUT)
+    command = conda_activate_command() + ['&', 'conda'] + list(args)
+    logger.debug('Executing command: `%s`', command)
+    process = sp.Popen(command, shell=True, stdout=sp.PIPE, stderr=sp.STDOUT)
     lines = []
     ostream = sys.stdout
 
@@ -299,6 +300,7 @@ def conda_exec(*args, **kwargs):
     print >> ostream, ''
     output = ''.join(lines)
     if process.returncode != 0:
+        logger.error('Error executing command: `%s`', command)
         raise RuntimeError(output)
     return output
 
@@ -307,23 +309,47 @@ def package_version(name):
     '''
     Parameters
     ----------
-    name : str
-        Name of installed Conda package.
+    name : str or list
+        Name(s) of installed Conda package.
 
     Returns
     -------
-    dict
-        Dictionary containing ``'name'``, ``'version'``, and ``'build'``.
+    dict or list
+        Dictionary (or dictionaries) containing ``'name'``, ``'version'``,
+        ``'features'``, ``'features'``, and ``'build'``.
+
+        If multiple package names were specified in :data:`name` argument, the
+        order of the list of version dictionaries is the same as the order of
+        the package names in the :data:`name` argument.
     '''
-    prefix = conda_prefix()
-    installed_pkgs = conda.cli.main_list.linked(prefix)
-    exitcode, output = (conda.cli.main_list
-                        .list_packages(prefix, installed_pkgs,
-                                       regex=r'^%s$' % name,
-                                       show_channel_urls=False,
-                                       format='human'))
-    if not output:
+    singleton = isinstance(name, types.StringTypes)
+    if singleton:
+        name = [name]
+
+    # Use `conda_exec` since
+    versions_js = conda_exec('list', '--json', '^({})$'.format('|'.join(name)))
+    versions = json.loads(versions_js)
+    if not versions:
         raise NameError('Package `{}` not installed.'.format(name))
-    return [dict(zip(['name', 'version', 'build'], re.split(r'\s+',
-                                                            line_i)[:3]))
-            for line_i in output][0]
+
+    cre_pkg_descriptor = re.compile(r'((?P<channel>.*?)::)?(?P<name>.+)-'
+                                    r'(?P<version>[^\-]+)-'
+                                    r'((?P<features>[^_]+)_)?'
+                                    r'(?P<build>\d+)')
+    version_dicts = [cre_pkg_descriptor.match(v_i).groupdict()
+                     for v_i in versions]
+
+    for version_i in version_dicts:
+        version_i['build'] = int(version_i['build'])
+
+    if singleton:
+        return version_dicts[0]
+    else:
+        # Return list of version dictionaries in same order as names where
+        # specified in `name` argument.
+        versions_dict = dict([(version_i['name'], version_i)
+                              for version_i in version_dicts])
+        for name_i in name:
+            if name_i not in versions_dict:
+                raise NameError('Package `{}` not installed.'.format(name_i))
+        return [versions_dict[name_i] for name_i in name]
