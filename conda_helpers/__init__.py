@@ -1,4 +1,6 @@
+import contextlib
 import itertools as it
+import logging
 import os
 import pkg_resources
 import re
@@ -6,6 +8,26 @@ import subprocess as sp
 import sys
 
 import path_helpers as ph
+
+
+@contextlib.contextmanager
+def logging_restore():
+    '''
+    Save logging state upon entering context and restore upon leaving.
+    '''
+    handlers = logging.root.handlers[:]
+    level = logging.root.getEffectiveLevel()
+    yield
+    handlers_to_remove = logging.root.handlers[:]
+    [logging.root.removeHandler(h) for h in handlers_to_remove]
+    [logging.root.addHandler(h) for h in handlers]
+    logging.root.setLevel(level)
+
+
+# Import within `logging_restore` context to prevent Conda from clobbering
+# active `logging` settings.
+with logging_restore():
+    import conda.cli.main_list
 
 
 def f_major_version(version):
@@ -292,3 +314,29 @@ def conda_exec(*args, **kwargs):
     if process.returncode != 0:
         raise RuntimeError(output)
     return output
+
+
+def package_version(name):
+    '''
+    Parameters
+    ----------
+    name : str
+        Name of installed Conda package.
+
+    Returns
+    -------
+    dict
+        Dictionary containing ``'name'``, ``'version'``, and ``'build'``.
+    '''
+    prefix = conda_prefix()
+    installed_pkgs = conda.cli.main_list.linked(prefix)
+    exitcode, output = (conda.cli.main_list
+                        .list_packages(prefix, installed_pkgs,
+                                       regex=r'^%s$' % name,
+                                       show_channel_urls=False,
+                                       format='human'))
+    if not output:
+        raise NameError('Package `{}` not installed.'.format(name))
+    return [dict(zip(['name', 'version', 'build'], re.split(r'\s+',
+                                                            line_i)[:3]))
+            for line_i in output][0]
