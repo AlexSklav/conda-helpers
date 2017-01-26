@@ -20,12 +20,10 @@ build:
 
 requirements:
   build:
-    - logging-helpers
     - path_helpers
     - pip
     - python 2.7*
 
   run:
-    - logging-helpers
     - path_helpers
     - python 2.7*
