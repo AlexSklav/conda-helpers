@@ -1,5 +1,6 @@
 import itertools as it
 import json
+import logging
 import os
 import pkg_resources
 import re
@@ -8,6 +9,7 @@ import sys
 
 import path_helpers as ph
 
+logger = logging.getLogger(__name__)
 
 def f_major_version(version):
     '''
@@ -275,8 +277,9 @@ def conda_exec(*args, **kwargs):
     verbose = kwargs.get('verbose')
 
     # Running in a Conda environment.
-    process = sp.Popen(conda_activate_command() + ['&', 'conda'] + list(args),
-                       shell=True, stdout=sp.PIPE, stderr=sp.STDOUT)
+    command = conda_activate_command() + ['&', 'conda'] + list(args)
+    logger.debug('Executing command: `%s`', command)
+    process = sp.Popen(command, shell=True, stdout=sp.PIPE, stderr=sp.STDOUT)
     lines = []
     ostream = sys.stdout
 
@@ -291,6 +294,7 @@ def conda_exec(*args, **kwargs):
     print >> ostream, ''
     output = ''.join(lines)
     if process.returncode != 0:
+        logger.error('Error executing command: `%s`', command)
         raise RuntimeError(output)
     return output
 
