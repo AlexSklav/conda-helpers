@@ -7,9 +7,11 @@ import platform
 import re
 import subprocess as sp
 import sys
+import tempfile as tmp
 import types
 
 import path_helpers as ph
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -353,3 +355,52 @@ def package_version(name):
             if name_i not in versions_dict:
                 raise NameError('Package `{}` not installed.'.format(name_i))
         return [versions_dict[name_i] for name_i in name]
+
+
+def development_setup(recipe_dir, verbose=True):
+    '''
+    Install build and run-time dependencies for specified Conda build recipe.
+
+    Parameters
+    ----------
+    recipe_dir : str
+        Path to Conda build recipe.
+    verbose : bool, optional
+        If ``True``, display output of ``conda install`` command.
+
+        If ``False``, do not display output of ``conda install`` command.
+
+        If ``None``, display ``.`` characters to indicate progress during
+        ``conda install`` command.
+    '''
+    recipe_dir = ph.path(recipe_dir).realpath()
+
+    # Extract list of build and run dependencies from Conda build recipe.
+    logger.info('Extract build dependencies from Conda recipe: %s', recipe_dir)
+    rendered_recipe = conda_exec('render', recipe_dir, verbose=False)
+    recipe = yaml.load(rendered_recipe)
+    requirements = recipe.get('requirements', {})
+    build_requirements = set(requirements.get('build', []))
+    run_requirements = set(requirements.get('run', []))
+    development_reqs = sorted(build_requirements.union(run_requirements))
+
+    # XXX Do not include dependencies with wildcard version specifiers, since
+    # they are not supported by `conda install`.
+    development_reqs = filter(lambda v: '*' not in v, development_reqs)
+
+    # Dump list of Conda requirements to a file and install dependencies using
+    # `conda install ...`.
+    logger.info('Install build and run-time dependencies:\n%s',
+                '\n'.join(' {}'.format(r) for r in development_reqs))
+    development_reqs_file = tmp.TemporaryFile(mode='w', prefix='%s-dev-req-' %
+                                              recipe_dir.name, delete=False)
+    try:
+        # Create string containing one package descriptor per line.
+        development_reqs_str = '\n'.join(development_reqs)
+        development_reqs_file.file.write(development_reqs_str)
+        development_reqs_file.file.close()
+        conda_exec('install', '-y', '--file', development_reqs_file.name,
+                   verbose=verbose)
+    finally:
+        # Remove temporary file containing list of Conda requirements.
+        ph.path(development_reqs_file.name).remove()

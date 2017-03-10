@@ -23,10 +23,12 @@ requirements:
     - path_helpers
     - pip
     - python 2.7*
+    - pyyaml
 
   run:
     - path_helpers
     - python 2.7*
+    - pyyaml
 
 test:
   imports:
