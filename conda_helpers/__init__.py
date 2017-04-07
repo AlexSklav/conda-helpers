@@ -357,7 +357,7 @@ def package_version(name):
         return [versions_dict[name_i] for name_i in name]
 
 
-def development_setup(recipe_dir, verbose=True):
+def development_setup(recipe_dir, *args, **kwargs):
     '''
     Install build and run-time dependencies for specified Conda build recipe.
 
@@ -365,6 +365,8 @@ def development_setup(recipe_dir, verbose=True):
     ----------
     recipe_dir : str
         Path to Conda build recipe.
+    *args
+        Additional arguments to pass to ``conda install`` command.
     verbose : bool, optional
         If ``True``, display output of ``conda install`` command.
 
@@ -373,6 +375,7 @@ def development_setup(recipe_dir, verbose=True):
         If ``None``, display ``.`` characters to indicate progress during
         ``conda install`` command.
     '''
+    verbose = kwargs.pop('verbose', True)
     recipe_dir = ph.path(recipe_dir).realpath()
 
     # Extract list of build and run dependencies from Conda build recipe.
@@ -400,7 +403,7 @@ def development_setup(recipe_dir, verbose=True):
         development_reqs_file.file.write(development_reqs_str)
         development_reqs_file.file.close()
         conda_exec('install', '-y', '--file', development_reqs_file.name,
-                   verbose=verbose)
+                   *args, verbose=verbose)
     finally:
         # Remove temporary file containing list of Conda requirements.
         ph.path(development_reqs_file.name).remove()
