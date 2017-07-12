@@ -330,19 +330,9 @@ def package_version(name):
 
     # Use `conda_exec` since
     versions_js = conda_exec('list', '--json', '^({})$'.format('|'.join(name)))
-    versions = json.loads(versions_js)
-    if not versions:
+    version_dicts = json.loads(versions_js)
+    if not version_dicts:
         raise NameError('Package `{}` not installed.'.format(name))
-
-    cre_pkg_descriptor = re.compile(r'((?P<channel>.*?)::)?(?P<name>.+)-'
-                                    r'(?P<version>[^\-]+)-'
-                                    r'((?P<features>[^_]+)_)?'
-                                    r'(?P<build>\d+)')
-    version_dicts = [cre_pkg_descriptor.match(v_i).groupdict()
-                     for v_i in versions]
-
-    for version_i in version_dicts:
-        version_i['build'] = int(version_i['build'])
 
     if singleton:
         return version_dicts[0]
