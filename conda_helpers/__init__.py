@@ -329,7 +329,13 @@ def package_version(name):
         name = [name]
 
     # Use `conda_exec` since
-    versions_js = conda_exec('list', '--json', '^({})$'.format('|'.join(name)))
+    versions_js = conda_exec('list', '--json',
+                             # XXX Add `' ?'` to force Windows to quote
+                             # argument due to a space.
+                             #
+                             # The argument **MUST** be quoted since it may
+                             # contain a pipe character (i.e., `|`).
+                             '^({}) ?$'.format('|'.join(name)))
     version_dicts = json.loads(versions_js)
     if not version_dicts:
         raise NameError('Package `{}` not installed.'.format(name))
