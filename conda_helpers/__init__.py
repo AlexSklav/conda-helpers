@@ -314,12 +314,16 @@ def conda_exec(*args, **kwargs):
     return output
 
 
-def package_version(name):
+def package_version(name, *args, **kwargs):
     '''
     Parameters
     ----------
     name : str or list
         Name(s) of installed Conda package.
+    *args
+        Additional args to pass to :func:`conda_exec`.
+    *kwargs
+        Additional keyword args to pass to :func:`conda_exec`.
 
     Returns
     -------
@@ -342,7 +346,8 @@ def package_version(name):
                              #
                              # The argument **MUST** be quoted since it may
                              # contain a pipe character (i.e., `|`).
-                             '^({}) ?$'.format('|'.join(name)))
+                             '^({}) ?$'.format('|'.join(name)), *args,
+                             **kwargs)
     version_dicts = json.loads(versions_js)
     if not version_dicts:
         raise NameError('Package `{}` not installed.'.format(name))
