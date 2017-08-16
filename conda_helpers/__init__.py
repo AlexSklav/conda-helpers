@@ -403,3 +403,61 @@ def development_setup(recipe_dir, *args, **kwargs):
     finally:
         # Remove temporary file containing list of Conda requirements.
         ph.path(development_reqs_file.name).remove()
+
+
+def install_info(install_response):
+    '''
+    Normalize ``conda install ...`` output, whether run in dry mode or not, to
+    return a list of unlinked packages and a list of linked packages.
+
+    .. versionadded:: 0.7
+
+
+    Parameters
+    ----------
+    install_response : dict
+        JSON decoded response from ``conda install ...`` command.
+
+    Returns
+    -------
+    unlinked_packages, linked_packages : list, list
+        If no packages were installed or removed:
+         - :data:`unlinked_packages` is set to ``None``.
+         - :data:`linked_packages` is set to ``None``.
+
+        If any packages are installed or removed:
+         - :data:`unlinked_packages` is a list of ``(<package name and
+           version>, <channel>)`` tuples corresponding to the packages that
+           were uninstalled/replaced.
+         - :data:`linked_packages` is a list of ``(<package name and version>,
+           <channel>)`` tuples corresponding to the packages that were
+           installed/upgraded.
+
+    Raises
+    ------
+    RuntimeError
+        If install response does not include item with key ``'success'``.
+    '''
+    f_format_version = lambda v: '{}=={}'.format(v['name'], v['version'])
+
+    if not install_response.get('success'):
+        raise RuntimeError('Install operation failed.')
+    if 'actions' not in install_response:
+        return None, None
+    if isinstance(install_response['actions'], list):
+        # Response was from a dry run.  It has a different format.
+        actions = install_response['actions'][0]
+        unlink_packages = [[f_format_version(v), v['channel']]
+                           for v in actions.get('UNLINK', [])]
+        link_packages = [[f_format_version(v), v['channel']]
+                         for v in actions.get('LINK', [])]
+    else:
+        unlink_packages = [v.split('::')[::-1]
+                           for v in actions.get('UNLINK', [])]
+        link_packages = [v.split('::')[::-1]
+                         for v in actions.get('LINK', [])]
+
+    # Sort list of packages to make output deterministic.
+    sorted_unlinked = sorted(unlink_packages)
+    sorted_linked = sorted(link_packages)
+    return sorted_unlinked, sorted_linked
