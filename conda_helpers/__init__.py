@@ -268,6 +268,13 @@ def conda_exec(*args, **kwargs):
     '''
     Execute command using ``conda`` executable in active Conda environment.
 
+    .. versionchanged:: 0.7.3
+        Do not escape `<`, `>` characters in `conda_exec`, since these
+        characters are required for less than or greater than version
+        specifiers.
+
+        For example, `"foo >2.0"`, `"foobar <3.0"`.
+
     Parameters
     ----------
     *args : list(str)
