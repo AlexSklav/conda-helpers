@@ -316,6 +316,9 @@ def conda_exec(*args, **kwargs):
 
 def package_version(name, *args, **kwargs):
     '''
+    .. versionchanged:: 0.8
+        Accept extra :data:`args` and :data`kwargs`.
+
     Parameters
     ----------
     name : str or list
