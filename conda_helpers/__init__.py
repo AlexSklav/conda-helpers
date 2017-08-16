@@ -419,6 +419,8 @@ def install_info(install_response):
 
     .. versionadded:: 0.7
 
+    .. versionchanged:: 0.7.3
+        Handle install log actions as :class:`dict` or :class:`list`.
 
     Parameters
     ----------
