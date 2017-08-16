@@ -268,6 +268,13 @@ def conda_exec(*args, **kwargs):
     '''
     Execute command using ``conda`` executable in active Conda environment.
 
+    .. versionchanged:: 0.7.3
+        Do not escape `<`, `>` characters in `conda_exec`, since these
+        characters are required for less than or greater than version
+        specifiers.
+
+        For example, `"foo >2.0"`, `"foobar <3.0"`.
+
     Parameters
     ----------
     *args : list(str)
@@ -281,7 +288,7 @@ def conda_exec(*args, **kwargs):
     verbose = kwargs.get('verbose')
 
     escape_char = '^' if platform.system() == 'Windows' else '\\'
-    args = [re.sub(r'([&\\<>\^|])', r'{}\1'.format(escape_char), arg_i)
+    args = [re.sub(r'([&\\\^|])', r'{}\1'.format(escape_char), arg_i)
             for arg_i in args]
 
     # Running in a Conda environment.
