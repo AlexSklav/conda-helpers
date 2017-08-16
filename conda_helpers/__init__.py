@@ -444,9 +444,10 @@ def install_info(install_response):
         raise RuntimeError('Install operation failed.')
     if 'actions' not in install_response:
         return None, None
+    # Read list of actions from response.
+    actions = install_response['actions'][0]
     if isinstance(install_response['actions'], list):
         # Response was from a dry run.  It has a different format.
-        actions = install_response['actions'][0]
         unlink_packages = [[f_format_version(v), v['channel']]
                            for v in actions.get('UNLINK', [])]
         link_packages = [[f_format_version(v), v['channel']]
