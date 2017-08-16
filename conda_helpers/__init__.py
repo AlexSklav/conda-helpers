@@ -419,6 +419,8 @@ def install_info(install_response):
 
     .. versionadded:: 0.7
 
+    .. versionchanged:: 0.7.3
+        Handle install log actions as :class:`dict` or :class:`list`.
 
     Parameters
     ----------
@@ -452,7 +454,9 @@ def install_info(install_response):
     if 'actions' not in install_response:
         return None, None
     # Read list of actions from response.
-    actions = install_response['actions'][0]
+    actions = install_response['actions']
+    if isinstance(actions, list):
+        actions = actions[0]
     if isinstance(install_response['actions'], list):
         # Response was from a dry run.  It has a different format.
         unlink_packages = [[f_format_version(v), v['channel']]
