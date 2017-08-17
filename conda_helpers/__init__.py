@@ -294,7 +294,7 @@ def conda_exec(*args, **kwargs):
 
     # Running in a Conda environment.
     command = conda_activate_command() + ['&', 'conda'] + list(args)
-    logger.debug('Executing command: `%s`', command)
+    logger.debug('Executing command: `%s`', sp.list2cmdline(command))
     process = sp.Popen(command, shell=True, stdout=sp.PIPE, stderr=sp.STDOUT)
     lines = []
     ostream = sys.stdout
@@ -310,7 +310,7 @@ def conda_exec(*args, **kwargs):
     print >> ostream, ''
     output = ''.join(lines)
     if process.returncode != 0:
-        logger.error('Error executing command: `%s`', command)
+        logger.error('Error executing command: `%s`', sp.list2cmdline(command))
         raise RuntimeError(output)
     return output
 
