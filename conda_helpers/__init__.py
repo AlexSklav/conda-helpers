@@ -276,6 +276,11 @@ def conda_exec(*args, **kwargs):
 
         For example, `"foo >2.0"`, `"foobar <3.0"`.
 
+    .. versionchanged:: 0.10
+        Log executed command as a string, rather than a list of arguments.
+        This should make it easier, for example, to copy and paste a command to
+        run manually.
+
     Parameters
     ----------
     *args : list(str)
