@@ -276,6 +276,11 @@ def conda_exec(*args, **kwargs):
 
         For example, `"foo >2.0"`, `"foobar <3.0"`.
 
+    .. versionchanged:: 0.10
+        Log executed command as a string, rather than a list of arguments.
+        This should make it easier, for example, to copy and paste a command to
+        run manually.
+
     Parameters
     ----------
     *args : list(str)
@@ -294,7 +299,7 @@ def conda_exec(*args, **kwargs):
 
     # Running in a Conda environment.
     command = conda_activate_command() + ['&', 'conda'] + list(args)
-    logger.debug('Executing command: `%s`', command)
+    logger.debug('Executing command: `%s`', sp.list2cmdline(command))
     process = sp.Popen(command, shell=True, stdout=sp.PIPE, stderr=sp.STDOUT)
     lines = []
     ostream = sys.stdout
@@ -310,7 +315,7 @@ def conda_exec(*args, **kwargs):
     print >> ostream, ''
     output = ''.join(lines)
     if process.returncode != 0:
-        logger.error('Error executing command: `%s`', command)
+        logger.error('Error executing command: `%s`', sp.list2cmdline(command))
         raise RuntimeError(output)
     return output
 
