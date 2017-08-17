@@ -1,3 +1,4 @@
+import io
 import itertools as it
 import json
 import logging
@@ -481,3 +482,37 @@ def install_info(install_response):
     sorted_unlinked = sorted(unlink_packages)
     sorted_linked = sorted(link_packages)
     return sorted_unlinked, sorted_linked
+
+
+def format_install_info(unlinked, linked):
+    '''
+    Format output of :func:`install_info` into human-readable form.
+
+    For example:
+
+        Uninstalled:
+         - `foo==3.2` (from `conda-forge`)
+
+        Installed:
+         - `foobar==1.7` (from `sci-bots`)
+         - `bar==1.7` (from `conda-forge`)
+
+    .. versionadded:: 0.9
+
+    Returns
+    -------
+    str
+        Formatted output of :func:`install_info`.
+    '''
+    output = io.BytesIO()
+    if unlinked:
+        print >> output, 'Uninstalled:'
+        for package_i, channel_i in unlinked:
+            print >> output, ' - `{}` (from `{}`)'.format(package_i, channel_i)
+    if unlinked and linked:
+        print >> output, ''
+    if linked:
+        print >> output, 'Installed:'
+        for package_i, channel_i in linked:
+            print >> output, ' - `{}` (from `{}`)'.format(package_i, channel_i)
+    return output.getvalue()
