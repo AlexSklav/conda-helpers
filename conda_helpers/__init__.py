@@ -497,6 +497,8 @@ def format_install_info(unlinked, linked):
          - `foobar==1.7` (from `sci-bots`)
          - `bar==1.7` (from `conda-forge`)
 
+    .. versionadded:: 0.9
+
     Returns
     -------
     str
