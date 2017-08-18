@@ -607,20 +607,56 @@ def format_install_info(unlinked, linked):
 
     .. versionadded:: 0.9
 
+    .. versionchanged:: 0.12.1
+        Implement handling :func:`install_info` output where
+        :data:`split_version` set to ``True``.
+
+    Parameters
+    ----------
+    unlinked : list or None
+        If no packages were installed or removed:
+         - :data:`unlinked_packages` is set to ``None``.
+         - :data:`linked_packages` is set to ``None``.
+    linked : list or None
+        List of package information tuple either of the form ``(<package name>,
+        <version>, <channel>)`` or ``(<package name and version>, <channel>)``.
+
     Returns
     -------
     str
         Formatted output of :func:`install_info`.
     '''
     output = io.BytesIO()
+
+    def _format_package_tuple(package_tuple):
+        '''
+        Parameters
+        ----------
+        package_tuple : tuple
+            Conda package information tuple either of the form
+            ``(<package name>, <version>, <channel>)`` or of the form
+            ``(<package name and version>, <channel>)``.
+
+        See also
+        --------
+        :func:`install_info`
+        '''
+        if len(package_tuple) == 2:
+            package_i, channel_i = package_tuple
+            return ' - `{}` (from `{}`)'.format(package_i,
+                                                          channel_i)
+        elif len(package_tuple) == 3:
+            package_i, version_i, channel_i = package_tuple
+            return ' - `{}=={}` (from `{}`)'.format(package_i, version_i,
+                                                    channel_i)
     if unlinked:
         print >> output, 'Uninstalled:'
-        for package_i, channel_i in unlinked:
-            print >> output, ' - `{}` (from `{}`)'.format(package_i, channel_i)
+        for package_tuple_i in linked:
+            print >> output, _format_package_tuple(package_tuple_i)
     if unlinked and linked:
         print >> output, ''
     if linked:
         print >> output, 'Installed:'
-        for package_i, channel_i in linked:
-            print >> output, ' - `{}` (from `{}`)'.format(package_i, channel_i)
+        for package_tuple_i in linked:
+            print >> output, _format_package_tuple(package_tuple_i)
     return output.getvalue()
