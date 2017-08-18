@@ -270,16 +270,21 @@ def conda_exec(*args, **kwargs):
     Execute command using ``conda`` executable in active Conda environment.
 
     .. versionchanged:: 0.7.3
-        Do not escape `<`, `>` characters in `conda_exec`, since these
+        Do not escape ``<``, ``>`` characters in ``conda_exec``, since these
         characters are required for less than or greater than version
         specifiers.
 
-        For example, `"foo >2.0"`, `"foobar <3.0"`.
+        For example, ``"foo >2.0"``, ``"foobar <3.0"``.
 
     .. versionchanged:: 0.10
         Log executed command as a string, rather than a list of arguments.
         This should make it easier, for example, to copy and paste a command to
         run manually.
+
+    .. versionchanged:: 0.11.1
+        Do not escape ``|``, ``^`` characters in ``conda_exec`` since these
+        characters are valid characters, for example, in package specifier
+        regular expressions.
 
     Parameters
     ----------
