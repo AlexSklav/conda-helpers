@@ -16,6 +16,44 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+
+class PackageNotFound(Exception):
+    def __init__(self, missing, available=None):
+        '''
+        Parameters
+        ----------
+        missing : str or list
+            Name(s) of missing Conda packages.
+        available : str or list, optional
+            List of package information dictionaries of a set of available
+            Conda packages.
+
+            Useful, for example, for code to continue processing packages that
+            **are** found.
+        '''
+        if isinstance(missing, types.StringTypes):
+            self.missing = [missing]
+        else:
+            self.missing = missing
+        if isinstance(available, types.StringTypes):
+            self.available = [available]
+        elif available is None:
+            self.available = []
+        else:
+            self.available = available
+
+    def __str__(self):
+        if len(self.missing) > 1:
+            return ('The following package(s) could not be found: {}'
+                    .format(', '.join('`{}`'.format(package_i)
+                                      for package_i in self.missing)))
+        elif self.missing:
+            return ('Package `{}` could not be found.'
+                    .format(self.missing[0]))
+        else:
+            return 'Package not found.'
+
+
 def f_major_version(version):
     '''
     Parameters
@@ -373,10 +411,13 @@ def package_version(name, *args, **kwargs):
         # specified in `name` argument.
         versions_dict = dict([(version_i['name'], version_i)
                               for version_i in version_dicts])
-        for name_i in name:
-            if name_i not in versions_dict:
-                raise NameError('Package `{}` not installed.'.format(name_i))
-        return [versions_dict[name_i] for name_i in name]
+        missing = [name_i for name_i in name if name_i not in versions_dict]
+        available = [versions_dict[name_i] for name_i in name
+                     if name_i not in missing]
+        if missing:
+            raise PackageNotFound(missing, available=available)
+        else:
+            return available
 
 
 def development_setup(recipe_dir, *args, **kwargs):
