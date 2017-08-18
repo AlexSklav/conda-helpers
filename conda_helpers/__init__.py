@@ -368,6 +368,18 @@ def package_version(name, *args, **kwargs):
     .. versionchanged:: 0.8
         Accept extra :data:`args` and :data`kwargs`.
 
+    .. versionchanged:: 0.12
+        Raise :class:`PackageNotFound` error if one or more specified packages
+        could not be found.
+
+        Note that the ``available`` attribute of the raised
+        :class:`PackageNotFound` object contains a list of package information
+        dictionaries of the set of specified packages that **are** available
+        Conda packages.
+
+        This is useful, for example, for code to continue processing packages
+        that **are** found.
+
     Parameters
     ----------
     name : str or list
@@ -386,6 +398,11 @@ def package_version(name, *args, **kwargs):
         If multiple package names were specified in :data:`name` argument, the
         order of the list of version dictionaries is the same as the order of
         the package names in the :data:`name` argument.
+
+    Raises
+    ------
+    PackageNotFound
+        If one or more specified packages could not be found.
     '''
     singleton = isinstance(name, types.StringTypes)
     if singleton:
