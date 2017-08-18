@@ -16,6 +16,44 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+
+class PackageNotFound(Exception):
+    def __init__(self, missing, available=None):
+        '''
+        Parameters
+        ----------
+        missing : str or list
+            Name(s) of missing Conda packages.
+        available : str or list, optional
+            List of package information dictionaries of a set of available
+            Conda packages.
+
+            Useful, for example, for code to continue processing packages that
+            **are** found.
+        '''
+        if isinstance(missing, types.StringTypes):
+            self.missing = [missing]
+        else:
+            self.missing = missing
+        if isinstance(available, types.StringTypes):
+            self.available = [available]
+        elif available is None:
+            self.available = []
+        else:
+            self.available = available
+
+    def __str__(self):
+        if len(self.missing) > 1:
+            return ('The following package(s) could not be found: {}'
+                    .format(', '.join('`{}`'.format(package_i)
+                                      for package_i in self.missing)))
+        elif self.missing:
+            return ('Package `{}` could not be found.'
+                    .format(self.missing[0]))
+        else:
+            return 'Package not found.'
+
+
 def f_major_version(version):
     '''
     Parameters
@@ -330,6 +368,18 @@ def package_version(name, *args, **kwargs):
     .. versionchanged:: 0.8
         Accept extra :data:`args` and :data`kwargs`.
 
+    .. versionchanged:: 0.12
+        Raise :class:`PackageNotFound` error if one or more specified packages
+        could not be found.
+
+        Note that the ``available`` attribute of the raised
+        :class:`PackageNotFound` object contains a list of package information
+        dictionaries of the set of specified packages that **are** available
+        Conda packages.
+
+        This is useful, for example, for code to continue processing packages
+        that **are** found.
+
     Parameters
     ----------
     name : str or list
@@ -348,6 +398,11 @@ def package_version(name, *args, **kwargs):
         If multiple package names were specified in :data:`name` argument, the
         order of the list of version dictionaries is the same as the order of
         the package names in the :data:`name` argument.
+
+    Raises
+    ------
+    PackageNotFound
+        If one or more specified packages could not be found.
     '''
     singleton = isinstance(name, types.StringTypes)
     if singleton:
@@ -373,10 +428,13 @@ def package_version(name, *args, **kwargs):
         # specified in `name` argument.
         versions_dict = dict([(version_i['name'], version_i)
                               for version_i in version_dicts])
-        for name_i in name:
-            if name_i not in versions_dict:
-                raise NameError('Package `{}` not installed.'.format(name_i))
-        return [versions_dict[name_i] for name_i in name]
+        missing = [name_i for name_i in name if name_i not in versions_dict]
+        available = [versions_dict[name_i] for name_i in name
+                     if name_i not in missing]
+        if missing:
+            raise PackageNotFound(missing, available=available)
+        else:
+            return available
 
 
 def development_setup(recipe_dir, *args, **kwargs):
