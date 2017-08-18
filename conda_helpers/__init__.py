@@ -294,7 +294,7 @@ def conda_exec(*args, **kwargs):
     verbose = kwargs.get('verbose')
 
     escape_char = '^' if platform.system() == 'Windows' else '\\'
-    args = [re.sub(r'([&\\\^|])', r'{}\1'.format(escape_char), arg_i)
+    args = [re.sub(r'([&\\])', r'{}\1'.format(escape_char), arg_i)
             for arg_i in args]
 
     # Running in a Conda environment.
