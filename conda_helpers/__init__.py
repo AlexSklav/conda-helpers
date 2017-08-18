@@ -426,7 +426,7 @@ def development_setup(recipe_dir, *args, **kwargs):
         ph.path(development_reqs_file.name).remove()
 
 
-def install_info(install_response):
+def install_info(install_response, split_version=False):
     '''
     Normalize ``conda install ...`` output, whether run in dry mode or not, to
     return a list of unlinked packages and a list of linked packages.
@@ -436,10 +436,19 @@ def install_info(install_response):
     .. versionchanged:: 0.7.3
         Handle install log actions as :class:`dict` or :class:`list`.
 
+    .. versionchanged:: 0.11
+        Optionally split package specifier string into package name and
+        version.
+
     Parameters
     ----------
     install_response : dict
         JSON decoded response from ``conda install ...`` command.
+    split_version : bool, optional
+        Split package specifier string into package name and version.
+
+        Default to ``False`` to maintain backwards compatibility with versions
+        ``< 0.11``.
 
     Returns
     -------
@@ -449,12 +458,19 @@ def install_info(install_response):
          - :data:`linked_packages` is set to ``None``.
 
         If any packages are installed or removed:
-         - :data:`unlinked_packages` is a list of ``(<package name and
-           version>, <channel>)`` tuples corresponding to the packages that
+         - :data:`unlinked_packages` is a list of tuples corresponding to the packages that
            were uninstalled/replaced.
          - :data:`linked_packages` is a list of ``(<package name and version>,
            <channel>)`` tuples corresponding to the packages that were
            installed/upgraded.
+
+        If :data:`split_version` is ``True``, each package tuple in
+        :data:`unlinked_packages`` and :data:`link_packages` is of the form
+        ``(<package name>, <version>, <channel>)``
+
+        If :data:`split_version` is ``False`` (default), each package tuple in
+        :data:`unlinked_packages`` and :data:`link_packages` is of the form
+        ``(<package name and version>, <channel>)``.
 
     Raises
     ------
@@ -486,7 +502,31 @@ def install_info(install_response):
     # Sort list of packages to make output deterministic.
     sorted_unlinked = sorted(unlink_packages)
     sorted_linked = sorted(link_packages)
-    return sorted_unlinked, sorted_linked
+
+    def _split_version(package_tuples):
+        '''
+        Parameters
+        ----------
+        package_tuples : list
+            List of package tuples of the form ``(<package name and version>,
+            <channel>)``.
+
+        Returns
+        -------
+        list
+            List of package tuples of the form ``(<package name>, <version>,
+            <channel>)``, i.e., the :data:`package_tuples` with the package
+            name and version number split apart.
+        '''
+        return [(package_i.split('==') if '==' in package_i
+                 else ['-'.join(package_i.split('-')[:-2]),
+                                package_i.split('-')[-2]])
+                 + [channel_i] for package_i, channel_i in package_tuples]
+
+    if split_version:
+        return map(_split_version, (sorted_unlinked, sorted_linked))
+    else:
+        return sorted_unlinked, sorted_linked
 
 
 def format_install_info(unlinked, linked):
