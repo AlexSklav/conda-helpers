@@ -304,7 +304,7 @@ def conda_version_info(package_name, channels=None):
 
 
 def conda_exec(*args, **kwargs):
-    '''
+    r'''
     Execute command using ``conda`` executable in active Conda environment.
 
     .. versionchanged:: 0.7.3
@@ -319,10 +319,11 @@ def conda_exec(*args, **kwargs):
         This should make it easier, for example, to copy and paste a command to
         run manually.
 
-    .. versionchanged:: 0.11.1
-        Do not escape ``|``, ``^`` characters in ``conda_exec`` since these
-        characters are valid characters, for example, in package specifier
-        regular expressions.
+    .. versionchanged:: 0.12.2
+        Escape ``&``, ``\``, ``|``, ``^``, ``<``, and ``<`` characters, but
+        **only** if there is not a space in an argument.  The reason is that if
+        there is a space in the argument, the argument will automatically be
+        quoted so character escaping is not necessary.
 
     Parameters
     ----------
@@ -336,8 +337,11 @@ def conda_exec(*args, **kwargs):
     '''
     verbose = kwargs.get('verbose')
 
+    # Only escape characters for arguments that do not include a space.  See
+    # docstring for details.
     escape_char = '^' if platform.system() == 'Windows' else '\\'
-    args = [re.sub(r'([&\\])', r'{}\1'.format(escape_char), arg_i)
+    args = [arg_i if ' ' in arg_i else
+            re.sub(r'([&\\^\|<>])', r'{}\1'.format(escape_char), arg_i)
             for arg_i in args]
 
     # Running in a Conda environment.
