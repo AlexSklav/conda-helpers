@@ -17,7 +17,7 @@ import yaml
 logger = logging.getLogger(__name__)
 
 '''
-.. versionadded:: X.X.X
+.. versionadded:: 0.12.3
 
 Match progress messages from Conda install output log.
 
@@ -31,7 +31,7 @@ cre_json_progress = re.compile(r'{"maxval":[^,]+,\s+"finished":[^,]+,'
                                r'\s+"fetch":\s+[^,]+,\s+"progress":[^}]+}')
 
 '''
-.. versionadded:: X.X.X
+.. versionadded:: 0.12.3
 
 Match non-JSON messages, e.g., `Conda menuinst log messages <https://github.com/ContinuumIO/menuinst/issues/49>`_.
 
@@ -356,7 +356,7 @@ def conda_exec(*args, **kwargs):
         there is a space in the argument, the argument will automatically be
         quoted so character escaping is not necessary.
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.12.3
         By default, strip non-json lines from output when ``--json`` arg is
         specified.
 
