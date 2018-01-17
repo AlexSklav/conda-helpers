@@ -16,6 +16,37 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+'''
+.. versionadded:: X.X.X
+
+Match progress messages from Conda install output log.
+
+For example:
+
+    {"maxval": 133256, "finished": false, "fetch": "microdrop-laun", "progress": 0}
+
+See `issue #5 <https://github.com/sci-bots/conda-helpers/issues/5>`_.
+'''
+cre_json_progress = re.compile(r'{"maxval":[^,]+,\s+"finished":[^,]+,'
+                               r'\s+"fetch":\s+[^,]+,\s+"progress":[^}]+}')
+
+'''
+.. versionadded:: X.X.X
+
+Match non-JSON messages, e.g., `Conda menuinst log messages <https://github.com/ContinuumIO/menuinst/issues/49>`_.
+
+For example:
+
+    INFO menuinst_win32:__init__(182): Menu: name: 'MicroDrop', prefix: 'C:\Users\chris\Miniconda2\envs\dropbot.py', env_name: 'dropbot.py', mode: 'None', used_mode: 'user'
+
+See also
+--------
+https://groups.google.com/a/continuum.io/forum/#!topic/anaconda/RWs9of4I2KM
+
+https://github.com/sci-bots/conda-helpers/issues/5
+'''
+cre_non_json = re.compile(r'^\w')
+
 
 class PackageNotFound(Exception):
     def __init__(self, missing, available=None):
@@ -325,6 +356,12 @@ def conda_exec(*args, **kwargs):
         there is a space in the argument, the argument will automatically be
         quoted so character escaping is not necessary.
 
+    .. versionchanged:: X.X.X
+        By default, strip non-json lines from output when ``--json`` arg is
+        specified.
+
+        See `issue #5 <https://github.com/sci-bots/conda-helpers/issues/5>`_.
+
     Parameters
     ----------
     *args : list(str)
@@ -336,6 +373,10 @@ def conda_exec(*args, **kwargs):
         Output from command (both ``stdout`` and ``stderr``).
     '''
     verbose = kwargs.get('verbose')
+    # By default, strip non-json lines from output when `--json` arg is
+    # specified.
+    # See https://github.com/sci-bots/microdrop/issues/249.
+    json_fix = kwargs.get('json_fix', True)
 
     # Only escape characters for arguments that do not include a space.  See
     # docstring for details.
@@ -360,7 +401,16 @@ def conda_exec(*args, **kwargs):
         lines.append(stdout_i)
     process.wait()
     print >> ostream, ''
-    output = ''.join(lines)
+
+    # Strip non-json lines from output when `--json` arg is specified.
+    if '--json' not in args or not json_fix:
+        output = ''.join(lines)
+    else:
+        output = ''.join(line_i for line_i in lines
+                         if not any(cre_j.search(line_i)
+                                    for cre_j in (cre_json_progress,
+                                                  cre_non_json)))
+
     if process.returncode != 0:
         logger.error('Error executing command: `%s`', sp.list2cmdline(command))
         raise RuntimeError(output)
