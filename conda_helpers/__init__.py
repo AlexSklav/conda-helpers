@@ -140,19 +140,11 @@ def conda_prefix():
         executable.
 
         Return ``None`` if not running in a Conda environment.
+
+    .. versionchanged:: 0.12.4
+        Use :attr:`sys.prefix` to look up Conda environment prefix.
     '''
-    if any(['continuum analytics, inc.' in sys.version.lower(),
-            'conda' in sys.version.lower()]):
-        # Assume running under Conda.
-        if 'CONDA_PREFIX' in os.environ:
-            conda_prefix = ph.path(os.environ['CONDA_PREFIX'])
-        else:
-            # Infer Conda prefix as parent directory of Python executable.
-            conda_prefix = ph.path(sys.executable).parent.realpath()
-    else:
-        # Assume running under Conda.
-        conda_prefix = None
-    return conda_prefix
+    return sys.prefix
 
 
 def conda_executable():
