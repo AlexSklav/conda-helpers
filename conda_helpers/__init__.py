@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-.. versionchanged:: X.X.X
+.. versionchanged:: 0.13
     Add support for Python 3.
 '''
 from __future__ import print_function
@@ -150,7 +150,7 @@ def conda_prefix():
     .. versionchanged:: 0.12.4
         Use :attr:`sys.prefix` to look up Conda environment prefix.
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.13
         Cast :attr:`sys.prefix` as a :class:`path_helpers.path` instance.
     '''
     return ph.path(sys.prefix)
