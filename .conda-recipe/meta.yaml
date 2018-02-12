@@ -23,10 +23,14 @@ requirements:
   build:
     - path_helpers
     - pyyaml
+    #: .. versionadded:: 0.13
+    - six
 
   run:
     - path_helpers
     - pyyaml
+    #: .. versionadded:: 0.13
+    - six
 
 test:
   imports:

@@ -1,17 +1,23 @@
+# -*- coding: utf-8 -*-
+'''
+.. versionchanged:: 0.13
+    Add support for Python 3.
+'''
+from __future__ import print_function
+
 import io
 import itertools as it
 import json
 import logging
-import os
 import pkg_resources
 import platform
 import re
 import subprocess as sp
 import sys
 import tempfile as tmp
-import types
 
 import path_helpers as ph
+import six
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -30,7 +36,7 @@ See `issue #5 <https://github.com/sci-bots/conda-helpers/issues/5>`_.
 cre_json_progress = re.compile(r'{"maxval":[^,]+,\s+"finished":[^,]+,'
                                r'\s+"fetch":\s+[^,]+,\s+"progress":[^}]+}')
 
-'''
+r'''
 .. versionadded:: 0.12.3
 
 Match non-JSON messages, e.g., `Conda menuinst log messages <https://github.com/ContinuumIO/menuinst/issues/49>`_.
@@ -62,11 +68,11 @@ class PackageNotFound(Exception):
             Useful, for example, for code to continue processing packages that
             **are** found.
         '''
-        if isinstance(missing, types.StringTypes):
+        if isinstance(missing, six.string_types):
             self.missing = [missing]
         else:
             self.missing = missing
-        if isinstance(available, types.StringTypes):
+        if isinstance(available, six.string_types):
             self.available = [available]
         elif available is None:
             self.available = []
@@ -143,8 +149,11 @@ def conda_prefix():
 
     .. versionchanged:: 0.12.4
         Use :attr:`sys.prefix` to look up Conda environment prefix.
+
+    .. versionchanged:: 0.13
+        Cast :attr:`sys.prefix` as a :class:`path_helpers.path` instance.
     '''
-    return sys.prefix
+    return ph.path(sys.prefix)
 
 
 def conda_executable():
@@ -225,9 +234,8 @@ def conda_upgrade(package_name, match_major_version=False, channels=None):
 
     if match_major_version:
         installed_major_version = f_major_version(version_info['installed'])
-        latest_version = filter(lambda v: f_major_version(v) ==
-                                installed_major_version,
-                                version_info['versions'])[-1]
+        latest_version = [v for v in version_info['versions']
+                          if f_major_version(v) == installed_major_version][-1]
     else:
         latest_version = version_info['versions'][-1]
 
@@ -250,9 +258,9 @@ def conda_upgrade(package_name, match_major_version=False, channels=None):
     # Iterate until end of `stdout` stream (i.e., `b''`).
     for stdout_i in iter(process.stdout.readline, b''):
         ostream.write('.')
-        lines.append(stdout_i)
+        lines.append(stdout_i.decode())
     process.wait()
-    print >> ostream, ''
+    print('', file=ostream)
     output = ''.join(lines)
     if process.returncode != 0:
         raise RuntimeError(output)
@@ -271,8 +279,7 @@ def conda_upgrade(package_name, match_major_version=False, channels=None):
         for package_i in packages:
             if package_i['package'] == package_name:
                 result['new_version'] = package_i['version']
-        installed_dependencies = filter(lambda p: p['package'] != package_name,
-                                        packages)
+        installed_dependencies = [p for p in packages if p['package'] != package_name]
         result['installed_dependencies'] = installed_dependencies
     return result
 
@@ -390,9 +397,9 @@ def conda_exec(*args, **kwargs):
             ostream.write('.')
         elif verbose:
             ostream.write(stdout_i)
-        lines.append(stdout_i)
+        lines.append(stdout_i.decode())
     process.wait()
-    print >> ostream, ''
+    print('', file=ostream)
 
     # Strip non-json lines from output when `--json` arg is specified.
     if '--json' not in args or not json_fix:
@@ -450,7 +457,7 @@ def package_version(name, *args, **kwargs):
     PackageNotFound
         If one or more specified packages could not be found.
     '''
-    singleton = isinstance(name, types.StringTypes)
+    singleton = isinstance(name, six.string_types)
     if singleton:
         name = [name]
 
@@ -515,7 +522,7 @@ def development_setup(recipe_dir, *args, **kwargs):
 
     # XXX Do not include dependencies with wildcard version specifiers, since
     # they are not supported by `conda install`.
-    development_reqs = filter(lambda v: '*' not in v, development_reqs)
+    development_reqs = [v for v in development_reqs if '*' not in v]
 
     # Dump list of Conda requirements to a file and install dependencies using
     # `conda install ...`.
@@ -586,7 +593,8 @@ def install_info(install_response, split_version=False):
     RuntimeError
         If install response does not include item with key ``'success'``.
     '''
-    f_format_version = lambda v: '{}=={}'.format(v['name'], v['version'])
+    def f_format_version(v):
+        return '{}=={}'.format(v['name'], v['version'])
 
     if not install_response.get('success'):
         raise RuntimeError('Install operation failed.')
@@ -629,11 +637,11 @@ def install_info(install_response, split_version=False):
         '''
         return [(package_i.split('==') if '==' in package_i
                  else ['-'.join(package_i.split('-')[:-2]),
-                                package_i.split('-')[-2]])
-                 + [channel_i] for package_i, channel_i in package_tuples]
+                       package_i.split('-')[-2]]) + [channel_i]
+                for package_i, channel_i in package_tuples]
 
     if split_version:
-        return map(_split_version, (sorted_unlinked, sorted_linked))
+        return list(map(_split_version, (sorted_unlinked, sorted_linked)))
     else:
         return sorted_unlinked, sorted_linked
 
@@ -689,20 +697,19 @@ def format_install_info(unlinked, linked):
         '''
         if len(package_tuple) == 2:
             package_i, channel_i = package_tuple
-            return ' - `{}` (from `{}`)'.format(package_i,
-                                                          channel_i)
+            return ' - `{}` (from `{}`)'.format(package_i, channel_i)
         elif len(package_tuple) == 3:
             package_i, version_i, channel_i = package_tuple
             return ' - `{}=={}` (from `{}`)'.format(package_i, version_i,
                                                     channel_i)
     if unlinked:
-        print >> output, 'Uninstalled:'
+        print('Uninstalled:', file=output)
         for package_tuple_i in linked:
-            print >> output, _format_package_tuple(package_tuple_i)
+            print(_format_package_tuple(package_tuple_i), file=output)
     if unlinked and linked:
-        print >> output, ''
+        print('', file=output)
     if linked:
-        print >> output, 'Installed:'
+        print('Installed:', file=output)
         for package_tuple_i in linked:
-            print >> output, _format_package_tuple(package_tuple_i)
+            print(_format_package_tuple(package_tuple_i), file=output)
     return output.getvalue()

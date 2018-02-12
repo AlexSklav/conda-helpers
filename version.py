@@ -61,6 +61,11 @@ _GIT_DESCRIPTION_RE = r'^v(?P<ver>%s)-(?P<commits>\d+)-g(?P<sha>[\da-f]+)$' % (
 
 
 def readGitVersion():
+    '''
+    .. versionchanged:: 0.6.1
+        Explicitly decode process ``stdout`` streams as string types to make
+        regular expression matches work with Python 3.
+    '''
     try:
         proc = subprocess.Popen(('git', 'describe', '--long',
                                  '--match', 'v[0-9]*.*'),
@@ -72,6 +77,7 @@ def readGitVersion():
         proc = subprocess.Popen(('git', 'rev-parse', '--abbrev-ref', 'HEAD'),
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         branch, _ = proc.communicate()
+        branch = branch.decode()
         if proc.returncode:
             return None
     except:
@@ -79,7 +85,7 @@ def readGitVersion():
 
     if not ver:
         return None
-    m = re.search(_GIT_DESCRIPTION_RE, ver)
+    m = re.search(_GIT_DESCRIPTION_RE, ver.decode())
     if not m:
         sys.stderr.write('version: git description (%s) is invalid, '
                          'ignoring\n' % ver)
@@ -93,7 +99,7 @@ def readGitVersion():
         version = '%s.post%d' % (
             m.group('ver'), commits)
 
-    if branch.strip() != 'master' and not branch.startswith('release'): 
+    if branch.strip() != 'master' and not branch.startswith('release'):
         version += '.dev%d' % int(m.group('sha'), 16)
 
     return version
@@ -101,7 +107,7 @@ def readGitVersion():
 
 def readReleaseVersion():
     try:
-        fd = open(RELEASE_VERSION_FILE)
+        fd = open(RELEASE_VERSION_FILE, 'r')
         try:
             ver = fd.readline().strip()
         finally:
@@ -131,5 +137,4 @@ def getVersion():
 
 
 if __name__ == '__main__':
-    print getVersion()
-
+    print(getVersion())
