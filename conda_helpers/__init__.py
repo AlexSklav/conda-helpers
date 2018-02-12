@@ -12,6 +12,7 @@ import tempfile as tmp
 import types
 
 import path_helpers as ph
+import six
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -62,11 +63,11 @@ class PackageNotFound(Exception):
             Useful, for example, for code to continue processing packages that
             **are** found.
         '''
-        if isinstance(missing, types.StringTypes):
+        if isinstance(missing, six.string_types):
             self.missing = [missing]
         else:
             self.missing = missing
-        if isinstance(available, types.StringTypes):
+        if isinstance(available, six.string_types):
             self.available = [available]
         elif available is None:
             self.available = []
@@ -453,7 +454,7 @@ def package_version(name, *args, **kwargs):
     PackageNotFound
         If one or more specified packages could not be found.
     '''
-    singleton = isinstance(name, types.StringTypes)
+    singleton = isinstance(name, six.string_types)
     if singleton:
         name = [name]
 
