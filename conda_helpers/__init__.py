@@ -143,8 +143,11 @@ def conda_prefix():
 
     .. versionchanged:: 0.12.4
         Use :attr:`sys.prefix` to look up Conda environment prefix.
+
+    .. versionchanged:: X.X.X
+        Cast :attr:`sys.prefix` as a :class:`path_helpers.path` instance.
     '''
-    return sys.prefix
+    return ph.path(sys.prefix)
 
 
 def conda_executable():
