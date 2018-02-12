@@ -30,7 +30,7 @@ See `issue #5 <https://github.com/sci-bots/conda-helpers/issues/5>`_.
 cre_json_progress = re.compile(r'{"maxval":[^,]+,\s+"finished":[^,]+,'
                                r'\s+"fetch":\s+[^,]+,\s+"progress":[^}]+}')
 
-'''
+r'''
 .. versionadded:: 0.12.3
 
 Match non-JSON messages, e.g., `Conda menuinst log messages <https://github.com/ContinuumIO/menuinst/issues/49>`_.
