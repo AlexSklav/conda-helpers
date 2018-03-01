@@ -507,14 +507,33 @@ def development_setup(recipe_dir, *args, **kwargs):
 
         If ``None``, display ``.`` characters to indicate progress during
         ``conda install`` command.
+
+
+    .. versionchanged:: 0.13.1
+        Strip build string (where necessary) from rendered recipe package
+        specifiers.  Fixes `issue #4 <https://github.com/sci-bots/conda-helpers/issues/4>`_
     '''
     verbose = kwargs.pop('verbose', True)
     recipe_dir = ph.path(recipe_dir).realpath()
 
     # Extract list of build and run dependencies from Conda build recipe.
     logger.info('Extract build dependencies from Conda recipe: %s', recipe_dir)
-    rendered_recipe = conda_exec('render', recipe_dir, verbose=False)
-    recipe = yaml.load(rendered_recipe)
+    # Render recipe for the Python version of the active Conda environment.
+    # Note that `conda render` is part of the `conda-build` package, which is
+    # installed in the `root` Conda environment, which may have a different
+    # version of Python installed.
+    PY = '{0.major}.{0.minor}'.format(sys.version_info)
+    recipe_file = tmp.TemporaryFile(mode='w', prefix='%s-dev-recipe-' %
+                                    recipe_dir.name, delete=False)
+    try:
+        recipe_file.file.close()
+        conda_exec('render', recipe_dir, '--python=' + PY,
+                   '-f', recipe_file.name, verbose=False)
+        with open(recipe_file.name, 'r') as input_:
+            recipe = yaml.load(input_.read())
+    finally:
+        # Remove temporary file containing rendered recipe.
+        ph.path(recipe_file.name).remove()
     requirements = recipe.get('requirements', {})
     build_requirements = set(requirements.get('build', []))
     run_requirements = set(requirements.get('run', []))
@@ -524,15 +543,28 @@ def development_setup(recipe_dir, *args, **kwargs):
     # they are not supported by `conda install`.
     development_reqs = [v for v in development_reqs if '*' not in v]
 
+    # Strip build string from package specifiers (if present).
+    development_reqs = [dict(zip(('package', 'version'), r.split(' ')[:2]))
+                        for r in development_reqs]
+
+    # Prepend explicit version numbers with '=='.
+    for req_i in development_reqs:
+        if 'version' in req_i and re.search('^\d', req_i['version']):
+            req_i['version'] = '==' + req_i['version']
+
     # Dump list of Conda requirements to a file and install dependencies using
     # `conda install ...`.
     logger.info('Install build and run-time dependencies:\n%s',
                 '\n'.join(' {}'.format(r) for r in development_reqs))
+
     development_reqs_file = tmp.TemporaryFile(mode='w', prefix='%s-dev-req-' %
                                               recipe_dir.name, delete=False)
+    requirement_lines = ['{} {}'.format(req_i['package'],
+                                        req_i.get('version', '')).strip()
+                         for req_i in development_reqs]
     try:
         # Create string containing one package descriptor per line.
-        development_reqs_str = '\n'.join(development_reqs)
+        development_reqs_str = '\n'.join(requirement_lines)
         development_reqs_file.file.write(development_reqs_str)
         development_reqs_file.file.close()
         conda_exec('install', '-y', '--file', development_reqs_file.name,
