@@ -21,13 +21,13 @@ build:
 
 requirements:
   build:
-    - path_helpers
+    - path_helpers >=0.7
     - pyyaml
     #: .. versionadded:: 0.13
     - six
 
   run:
-    - path_helpers
+    - path_helpers >=0.7
     - pyyaml
     #: .. versionadded:: 0.13
     - six
