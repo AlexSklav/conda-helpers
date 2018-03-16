@@ -25,7 +25,7 @@ requirements:
     - pyyaml
     #: .. versionadded:: 0.13
     - six
-    #: .. versionadded:: X.X.X
+    #: .. versionadded:: 0.15
     - trollius
 
   run:
@@ -33,7 +33,7 @@ requirements:
     - pyyaml
     #: .. versionadded:: 0.13
     - six
-    #: .. versionadded:: X.X.X
+    #: .. versionadded:: 0.15
     - trollius
 
 test:

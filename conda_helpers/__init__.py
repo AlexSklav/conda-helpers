@@ -36,7 +36,7 @@ else:
 
 def new_file_event_loop():
     '''
-    .. versionadded:: X.X.X
+    .. versionadded:: 0.15
 
 
     Returns
@@ -53,7 +53,7 @@ def new_file_event_loop():
 
 def ensure_event_loop():
     '''
-    .. versionadded:: X.X.X
+    .. versionadded:: 0.15
 
 
     Get existing event loop or create a new one if necessary.
@@ -75,7 +75,7 @@ def ensure_event_loop():
 
 def with_loop(func):
     '''
-    .. versionadded:: X.X.X
+    .. versionadded:: 0.15
 
 
     Decorator to run function within an asyncio event loop.
@@ -324,7 +324,7 @@ def conda_upgrade(package_name, match_major_version=False, channels=None):
     :func:`pip_helpers.upgrade`
 
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.15
         Use asynchronous :func:`run_command` coroutine to better stream
         ``stdout`` and ``stderr``.
     '''
@@ -484,7 +484,7 @@ def conda_exec(*args, **kwargs):
         Output from command (both ``stdout`` and ``stderr``).
 
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.15
         Use asynchronous :func:`run_command` coroutine to better stream
         ``stdout`` and ``stderr``.
     '''
