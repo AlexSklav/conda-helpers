@@ -25,12 +25,16 @@ requirements:
     - pyyaml
     #: .. versionadded:: 0.13
     - six
+    #: .. versionadded:: X.X.X
+    - trollius
 
   run:
     - path_helpers >=0.7
     - pyyaml
     #: .. versionadded:: 0.13
     - six
+    #: .. versionadded:: X.X.X
+    - trollius
 
 test:
   imports:

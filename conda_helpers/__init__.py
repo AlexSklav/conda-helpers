@@ -3,8 +3,9 @@
 .. versionchanged:: 0.13
     Add support for Python 3.
 '''
-from __future__ import print_function
+from __future__ import absolute_import, print_function, unicode_literals
 
+from functools import wraps
 import io
 import itertools as it
 import json
@@ -15,12 +16,122 @@ import re
 import subprocess as sp
 import sys
 import tempfile as tmp
+import threading
 
 import path_helpers as ph
 import six
 import yaml
 
 logger = logging.getLogger(__name__)
+
+if sys.version_info <= (3, 4):
+    import trollius as asyncio
+
+    from ._async_py27 import run_command
+else:
+    import asyncio
+
+    from ._async_py35 import run_command
+
+
+def new_file_event_loop():
+    '''
+    .. versionadded:: X.X.X
+
+
+    Returns
+    -------
+    asyncio.BaseEventLoop
+        Event loop capable of monitoring file IO events, including ``stdout``
+        and ``stderr`` pipes.  **Note that on Windows, the default event loop
+        _does not_ support file or stream events.  Instead, a
+        :class:`ProactorEventLoop` must explicitly be used on Windows. **
+    '''
+    return (asyncio.ProactorEventLoop() if platform.system() == 'Windows'
+            else asyncio.new_event_loop())
+
+
+def ensure_event_loop():
+    '''
+    .. versionadded:: X.X.X
+
+
+    Get existing event loop or create a new one if necessary.
+
+    Returns
+    -------
+    asyncio.BaseEventLoop
+    '''
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError as e:
+        if 'There is no current event loop' in str(e):
+            loop = new_file_event_loop()
+            asyncio.set_event_loop(loop)
+        else:
+            raise
+    return loop
+
+
+def with_loop(func):
+    '''
+    .. versionadded:: X.X.X
+
+
+    Decorator to run function within an asyncio event loop.
+
+    .. notes::
+        Uses :class:`asyncio.ProactorEventLoop` on Windows to support file I/O
+        events, e.g., serial device events.
+
+        If an event loop is already bound to the thread, but is either a)
+        currently running, or b) *not a :class:`asyncio.ProactorEventLoop`
+        instance*, execute function in a new thread running a new
+        :class:`asyncio.ProactorEventLoop` instance.
+    '''
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        loop = ensure_event_loop()
+
+        thread_required = False
+        if loop.is_running():
+            logger.debug('Event loop is already running.')
+            thread_required = True
+        elif all([platform.system() == 'Windows',
+                  not isinstance(loop, asyncio.ProactorEventLoop)]):
+            logger.debug('`ProactorEventLoop` required, not `%s`'
+                         'loop in background thread.', type(loop))
+            thread_required = True
+
+        if thread_required:
+            logger.debug('Execute new loop in background thread.')
+            finished = threading.Event()
+
+            def _run(generator):
+                loop = ensure_event_loop()
+                try:
+                    result = loop.run_until_complete(asyncio
+                                                     .ensure_future(generator))
+                except Exception as e:
+                    finished.result = None
+                    finished.error = e
+                else:
+                    finished.result = result
+                    finished.error = None
+                finished.set()
+            thread = threading.Thread(target=_run,
+                                      args=(func(*args, **kwargs), ))
+            thread.daemon = True
+            thread.start()
+            finished.wait()
+            if finished.error is not None:
+                raise finished.error
+            return finished.result
+
+        logger.debug('Execute in exiting event loop in main thread')
+        return loop.run_until_complete(func(**kwargs))
+    return wrapped
+
 
 '''
 .. versionadded:: 0.12.3
@@ -36,14 +147,14 @@ See `issue #5 <https://github.com/sci-bots/conda-helpers/issues/5>`_.
 cre_json_progress = re.compile(r'{"maxval":[^,]+,\s+"finished":[^,]+,'
                                r'\s+"fetch":\s+[^,]+,\s+"progress":[^}]+}')
 
-r'''
+'''
 .. versionadded:: 0.12.3
 
 Match non-JSON messages, e.g., `Conda menuinst log messages <https://github.com/ContinuumIO/menuinst/issues/49>`_.
 
 For example:
 
-    INFO menuinst_win32:__init__(182): Menu: name: 'MicroDrop', prefix: 'C:\Users\chris\Miniconda2\envs\dropbot.py', env_name: 'dropbot.py', mode: 'None', used_mode: 'user'
+    INFO menuinst_win32:__init__(182): Menu: name: 'MicroDrop', prefix: 'dropbot.py', env_name: 'dropbot.py', mode: 'None', used_mode: 'user'
 
 See also
 --------
@@ -211,6 +322,11 @@ def conda_upgrade(package_name, match_major_version=False, channels=None):
     See also
     --------
     :func:`pip_helpers.upgrade`
+
+
+    .. versionchanged:: X.X.X
+        Use asynchronous :func:`run_command` coroutine to better stream
+        ``stdout`` and ``stderr``.
     '''
     result = {'package': package_name,
               'original_version': None,
@@ -248,28 +364,23 @@ def conda_upgrade(package_name, match_major_version=False, channels=None):
     else:
         channels_args = list(it.chain(*[['-c', c] for c in channels]))
     # Running in a Conda environment.
-    process = sp.Popen(conda_activate_command() +
-                       ['&', 'conda', 'install'] + channels_args +
-                       ['-y', '{}=={}'.format(package_name, latest_version)],
-                       shell=True, stdout=sp.PIPE, stderr=sp.STDOUT)
-    lines = []
-    ostream = sys.stdout
+    command = (conda_activate_command() + ['&', 'conda', 'install'] +
+               channels_args + ['-y', '{}=={}'.format(package_name,
+                                                      latest_version)])
+    returncode, stdout, stderr = with_loop(run_command)(command, shell=True,
+                                                        verbose=True)
+    if returncode != 0:
+        message = ('Error executing: `{}`.\nstdout\n------\n\n{}\n\n'
+                   'stderr\n------\n\n{}'.format(sp.list2cmdline(command),
+                                                 stdout, stderr))
+        logger.error(message)
+        raise RuntimeError(message)
 
-    # Iterate until end of `stdout` stream (i.e., `b''`).
-    for stdout_i in iter(process.stdout.readline, b''):
-        ostream.write('.')
-        lines.append(stdout_i.decode())
-    process.wait()
-    print('', file=ostream)
-    output = ''.join(lines)
-    if process.returncode != 0:
-        raise RuntimeError(output)
-
-    if '# All requested packages already installed.' in output:
+    if '# All requested packages already installed.' in stdout:
         pass
-    elif 'The following NEW packages will be INSTALLED' in output:
+    elif 'The following NEW packages will be INSTALLED' in stdout:
         match = re.search(r'The following NEW packages will be INSTALLED:\s+'
-                          r'(?P<packages>.*)\s+Linking packages', output,
+                          r'(?P<packages>.*)\s+Linking packages', stdout,
                           re.MULTILINE | re.DOTALL)
         cre_package = re.compile(r'\s*(?P<package>\S+):\s+'
                                  r'(?P<version>\S+)-[^-]+\s+')
@@ -279,7 +390,8 @@ def conda_upgrade(package_name, match_major_version=False, channels=None):
         for package_i in packages:
             if package_i['package'] == package_name:
                 result['new_version'] = package_i['version']
-        installed_dependencies = [p for p in packages if p['package'] != package_name]
+        installed_dependencies = [p for p in packages
+                                  if p['package'] != package_name]
         result['installed_dependencies'] = installed_dependencies
     return result
 
@@ -370,8 +482,14 @@ def conda_exec(*args, **kwargs):
     -------
     str
         Output from command (both ``stdout`` and ``stderr``).
+
+
+    .. versionchanged:: X.X.X
+        Use asynchronous :func:`run_command` coroutine to better stream
+        ``stdout`` and ``stderr``.
     '''
     verbose = kwargs.get('verbose')
+
     # By default, strip non-json lines from output when `--json` arg is
     # specified.
     # See https://github.com/sci-bots/microdrop/issues/249.
@@ -387,33 +505,22 @@ def conda_exec(*args, **kwargs):
     # Running in a Conda environment.
     command = conda_activate_command() + ['&', 'conda'] + list(args)
     logger.debug('Executing command: `%s`', sp.list2cmdline(command))
-    process = sp.Popen(command, shell=True, stdout=sp.PIPE, stderr=sp.STDOUT)
-    lines = []
-    ostream = sys.stdout
-
-    # Iterate until end of `stdout` stream (i.e., `b''`).
-    for stdout_i in iter(process.stdout.readline, b''):
-        if verbose is None:
-            ostream.write('.')
-        elif verbose:
-            ostream.write(stdout_i)
-        lines.append(stdout_i.decode())
-    process.wait()
-    print('', file=ostream)
+    returncode, stdout, stderr = with_loop(run_command)(command, shell=True,
+                                                        verbose=verbose)
+    if returncode != 0:
+        message = ('Error executing: `{}`.\nstdout\n------\n\n{}\n\n'
+                   'stderr\n------\n\n{}'.format(sp.list2cmdline(command),
+                                                 stdout, stderr))
+        logger.error(message)
+        raise RuntimeError(message)
 
     # Strip non-json lines from output when `--json` arg is specified.
-    if '--json' not in args or not json_fix:
-        output = ''.join(lines)
-    else:
-        output = ''.join(line_i for line_i in lines
+    if '--json' in args and json_fix:
+        stdout = ''.join(line_i for line_i in stdout.splitlines()
                          if not any(cre_j.search(line_i)
                                     for cre_j in (cre_json_progress,
                                                   cre_non_json)))
-
-    if process.returncode != 0:
-        logger.error('Error executing command: `%s`', sp.list2cmdline(command))
-        raise RuntimeError(output)
-    return output
+    return stdout
 
 
 def package_version(name, *args, **kwargs):
@@ -606,8 +713,8 @@ def install_info(install_response, split_version=False):
          - :data:`linked_packages` is set to ``None``.
 
         If any packages are installed or removed:
-         - :data:`unlinked_packages` is a list of tuples corresponding to the packages that
-           were uninstalled/replaced.
+         - :data:`unlinked_packages` is a list of tuples corresponding to the
+           packages that were uninstalled/replaced.
          - :data:`linked_packages` is a list of ``(<package name and version>,
            <channel>)`` tuples corresponding to the packages that were
            installed/upgraded.
