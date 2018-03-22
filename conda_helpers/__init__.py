@@ -852,3 +852,4 @@ def format_install_info(unlinked, linked):
         for package_tuple_i in linked:
             print(_format_package_tuple(package_tuple_i), file=output)
     return output.getvalue()
+
