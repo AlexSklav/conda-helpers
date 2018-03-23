@@ -3,15 +3,17 @@ u'''
 Execute Conda commands, reusing cached output if available.
 '''
 from __future__ import absolute_import, unicode_literals, print_function
+from argparse import ArgumentParser
 from collections import OrderedDict
 from functools import wraps
-from argparse import ArgumentParser
 import datetime as dt
-import path_helpers as ph
+import re
+import subprocess as sp
 import sys
 
 import colorama as _C
 import joblib as jl
+import path_helpers as ph
 import six
 
 import conda_helpers as ch
@@ -24,6 +26,39 @@ BASE_PARSER.add_argument('--cache-dir', type=ph.path, help='Cache directory '
 BASE_PARSER.add_argument('-f', '--force', action='store_true', help='Force '
                          'execution of command (do not used cached result).')
 BASE_PARSER.add_argument('-v', '--verbose', action='store_true')
+
+
+def git_src_info(meta_path):
+    '''
+    Parameters
+    ----------
+    meta_path : str
+        Path to ``meta.yaml`` Conda recipe file.
+
+    Returns
+    -------
+    tuple(path, git describe, HEAD hash) or None
+        Return ``None`` if no ``git_url`` is specified in the ``meta.yaml``
+        file.  Otherwise, return ``git`` info for recipe source.
+    '''
+    meta_path = ph.path(meta_path)
+    recipe_path = meta_path.parent
+
+    match = re.search(r'git_url: +(?P<git_url>[\S^#]*).*$', meta_path.text(),
+                      flags=re.MULTILINE)
+
+    git_url = ph.path(match.group('git_url'))
+
+    if git_url.isabs():
+        git_dir = git_url
+    else:
+        git_dir = recipe_path.joinpath(git_url).realpath()
+
+    if git_dir.isdir():
+        describe = sp.check_output('git describe --tags --dirty',
+                                   cwd=git_dir).strip()
+        head = sp.check_output('git rev-parse HEAD', cwd=git_dir).strip()
+        return git_dir, describe, head
 
 
 @wraps(ch.conda_exec)
@@ -42,6 +77,8 @@ def conda_exec_memoize(*args, **kwargs):
 
     cmd_args = list(args)
 
+    __git_revisions__ = tuple()
+
     for i, a in enumerate(args):
         if isinstance(a, six.string_types):
             if i > 0 and args[i - 1] == '--croot':
@@ -55,16 +92,35 @@ def conda_exec_memoize(*args, **kwargs):
                     # explicitly ignored.  Add hash of file contents to
                     # arguments to allow for content-specific memoization.
                     __file_hashes__ += a.realpath(), a.read_hexhash('sha1')
+                    if a.name == 'meta.yaml':
+                        git_info = git_src_info(a)
+                        __git_revisions__ += (git_info, )
                 elif a.isdir():
                     # Argument is a path to a directory that exists and is not
                     # explicitly ignored.  Add hashes of directory contents to
                     # arguments to allow for content-specific memoization.
-                    __file_hashes__ += (a.realpath(),
-                                        tuple([(f.realpath(),
-                                                f.read_hexhash('sha1'))
-                                               for f in a.walkfiles()]))
+                    files = []
+                    for f in a.walkfiles():
+                        files.append((f.realpath(), f.read_hexhash('sha1')))
+                        if f.name == 'meta.yaml':
+                            git_info = git_src_info(f)
+                            __git_revisions__ += (git_info, )
+                    __file_hashes__ += (a.realpath(), tuple(files))
 
     kwargs['verbose'] = True
+
+    if __git_revisions__:
+        kwargs['__git_revisions__'] = __git_revisions__
+        if verbose:
+            for git_dir_i, describe_i, head_i in __git_revisions__:
+                print(_C.Fore.MAGENTA + '  git source:',
+                      (_C.Fore.WHITE + '{}@'.format(git_dir_i.name)) +
+                      (_C.Fore.LIGHTGREEN_EX + '{}'.format(describe_i
+                                                           .decode('utf8'))),
+                      (_C.Fore.LIGHTCYAN_EX + '({})'.format(head_i[:8]
+                                                            .decode('utf8'))),
+                      file=sys.stderr)
+        kwargs['__git_revisions__'] = __git_revisions__
 
     kwargs['__file_hashes__'] = __file_hashes__
     output_dir, argument_hash = conda_exec._get_output_dir(*cmd_args, **kwargs)
