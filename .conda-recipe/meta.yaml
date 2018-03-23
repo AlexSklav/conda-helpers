@@ -18,9 +18,13 @@ build:
   number: 0
   script: python setup.py install --single-version-externally-managed --record record.txt
   noarch: python
+  entry_points:
+    - condac = conda_helpers.__main__:main
 
 requirements:
   build:
+    - colorama
+    - joblib
     - path_helpers >=0.7
     - pyyaml
     #: .. versionadded:: 0.13
@@ -29,6 +33,9 @@ requirements:
     - trollius
 
   run:
+    - colorama
+    - git
+    - joblib
     - path_helpers >=0.7
     - pyyaml
     #: .. versionadded:: 0.13
@@ -39,3 +46,7 @@ requirements:
 test:
   imports:
     - conda_helpers
+  commands:
+    - condac -h
+    - condac render -h
+    - condac build -h

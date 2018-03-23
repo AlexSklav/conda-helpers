@@ -3,17 +3,19 @@ import sys
 import setuptools as st
 
 sys.path.insert(0, '.')
-import version
+import versioneer
+
 
 st.setup(name='conda-helpers',
-         version=version.getVersion(),
+         version=versioneer.get_version(),
+         cmdclass=versioneer.get_cmdclass(),
          description='Add description here.',
          keywords='',
          author='Christian Fobel',
          author_email='christian@fobel.net',
-         url='https://github.com/wheeler-microfluidics/conda-helpers',
+         url='https://github.com/sci-bots/conda-helpers',
          license='BSD',
          packages=['conda_helpers'],
-         install_requires=['path-helpers'],
+         install_requires=['colorama', 'joblib', 'path-helpers', 'six'],
          # Install data listed in `MANIFEST.in`
          include_package_data=True)

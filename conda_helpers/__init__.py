@@ -22,8 +22,9 @@ import path_helpers as ph
 import six
 import yaml
 
-logger = logging.getLogger(__name__)
-
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
 if sys.version_info <= (3, 4):
     import trollius as asyncio
 
@@ -32,6 +33,8 @@ else:
     import asyncio
 
     from ._async_py35 import run_command
+
+logger = logging.getLogger(__name__)
 
 
 def new_file_event_loop():
