@@ -177,7 +177,10 @@ def main(args=None):
         cmd_args = []
         parser_args = args
 
-    parser = ArgumentParser(description='Memoized Conda commands.')
+    parser = ArgumentParser(prog='condac', epilog='Version %s' %
+                            ch.__version__, description='Cached Conda Memoized'
+                            ' Conda commands.')
+    parser.add_argument('--version', action='store_true')
 
     sub = parser.add_subparsers(dest='command')
     supported_commands = ['render', 'build']
@@ -188,6 +191,10 @@ def main(args=None):
                               for subparser_name_i in supported_commands])
 
     args = parser.parse_args(parser_args)
+
+    if args.version:
+        print(ch.__version__)
+        return
 
     if not args.command:
         parser.error('No command specified.  Must specify one of: `{}`'
