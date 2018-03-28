@@ -630,7 +630,7 @@ def development_setup(recipe_dir, *args, **kwargs):
         --------
         https://conda.io/docs/user-guide/tasks/build-packages/define-metadata.html#outputs-section
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.19
         Use :func:`render` to render recipe.
     '''
     verbose = kwargs.pop('verbose', True)
@@ -885,7 +885,7 @@ def render(recipe_dir, **kwargs):
         Render recipe text.
 
 
-    .. versionadded:: X.X.X
+    .. versionadded:: 0.19
     '''
     recipe_dir = ph.path(recipe_dir).realpath()
 
