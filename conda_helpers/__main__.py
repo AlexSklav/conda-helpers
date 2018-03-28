@@ -141,6 +141,8 @@ def conda_exec_memoize(*args, **kwargs):
         cached = False
 
     if verbose:
+        print(_C.Fore.MAGENTA + 'Command:', _C.Fore.WHITE +
+              sp.list2cmdline(args), file=sys.stderr)
         if cached:
             print(_C.Fore.MAGENTA + 'Reusing cached result...',
                   file=sys.stderr)
