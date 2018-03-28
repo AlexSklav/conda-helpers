@@ -20,9 +20,9 @@ import threading
 
 import path_helpers as ph
 import six
-import yaml
 
 from ._version import get_versions
+from .recipes import recipe_objs, find_requirements
 __version__ = get_versions()['version']
 del get_versions
 if sys.version_info <= (3, 4):
@@ -622,6 +622,13 @@ def development_setup(recipe_dir, *args, **kwargs):
     .. versionchanged:: 0.13.1
         Strip build string (where necessary) from rendered recipe package
         specifiers.  Fixes `issue #4 <https://github.com/sci-bots/conda-helpers/issues/4>`_
+
+    .. versionchanged:: X.X.X
+        Add support for recipes with multiple outputs.
+
+        See also
+        --------
+        https://conda.io/docs/user-guide/tasks/build-packages/define-metadata.html#outputs-section
     '''
     verbose = kwargs.pop('verbose', True)
     recipe_dir = ph.path(recipe_dir).realpath()
@@ -633,55 +640,60 @@ def development_setup(recipe_dir, *args, **kwargs):
     # installed in the `root` Conda environment, which may have a different
     # version of Python installed.
     PY = '{0.major}.{0.minor}'.format(sys.version_info)
-    recipe_file = tmp.TemporaryFile(mode='w', prefix='%s-dev-recipe-' %
-                                    recipe_dir.name, delete=False)
-    try:
-        recipe_file.file.close()
-        conda_exec('render', recipe_dir, '--python=' + PY,
-                   '-f', recipe_file.name, verbose=False)
-        with open(recipe_file.name, 'r') as input_:
-            recipe = yaml.load(input_.read())
-    finally:
-        # Remove temporary file containing rendered recipe.
-        ph.path(recipe_file.name).remove()
-    requirements = recipe.get('requirements', {})
-    build_requirements = set(requirements.get('build', []))
-    run_requirements = set(requirements.get('run', []))
-    development_reqs = sorted(build_requirements.union(run_requirements))
+
+    command = (conda_activate_command() +
+               ['&', 'python', '-m', 'conda_helpers', 'render', '-v', '--',
+                recipe_dir, '--python=' + PY])
+    returncode, stdout, stderr = with_loop(run_command)(command, shell=True,
+                                                        verbose=False)
+    recipe = stdout
+
+    # Decode one or more outputs from the recipe yaml.
+    recipe_objs_ = recipe_objs(recipe)
+    # Find all `build` and `run` requirements across all outputs.
+    requirements = list(it.chain(*map(find_requirements, recipe_objs_)))
+    # Extract package name and version (if specified) from each requirement.
+    # XXX Do not include dependencies with wildcard version specifiers, since
+    # they are not supported by `conda install`.
+    required_packages = [dict(zip(('package', 'version'), r[1].split(' ')[:2]))
+                         for r in requirements]
 
     # XXX Do not include dependencies with wildcard version specifiers, since
     # they are not supported by `conda install`.
-    development_reqs = [v for v in development_reqs if '*' not in v]
-
-    # Strip build string from package specifiers (if present).
-    development_reqs = [dict(zip(('package', 'version'), r.split(' ')[:2]))
-                        for r in development_reqs]
+    required_packages = [v for v in required_packages
+                         if '*' not in v.get('version', '')]
 
     # Prepend explicit version numbers with '=='.
-    for req_i in development_reqs:
+    for req_i in required_packages:
         if 'version' in req_i and re.search('^\d', req_i['version']):
             req_i['version'] = '==' + req_i['version']
 
+    # Dump sorted list of required packages.
+    required_strs = sorted('  {}{}'.format(r['package'],
+                                           ' {}'.format(r['version']
+                                                        if 'version' in r
+                                                        else ''))
+                           for r in required_packages)
+    logger.info('Install build and run-time dependencies:\n%s',
+                '\n'.join(required_strs))
+
     # Dump list of Conda requirements to a file and install dependencies using
     # `conda install ...`.
-    logger.info('Install build and run-time dependencies:\n%s',
-                '\n'.join(' {}'.format(r) for r in development_reqs))
-
-    development_reqs_file = tmp.TemporaryFile(mode='w', prefix='%s-dev-req-' %
-                                              recipe_dir.name, delete=False)
-    requirement_lines = ['{} {}'.format(req_i['package'],
-                                        req_i.get('version', '')).strip()
-                         for req_i in development_reqs]
+    required_packages_file = tmp.TemporaryFile(mode='w', prefix='%s-dev-req-' %
+                                               recipe_dir.name, delete=False)
+    required_packages_lines = ['{} {}'.format(req_i['package'],
+                                              req_i.get('version', '')).strip()
+                               for req_i in required_packages]
     try:
         # Create string containing one package descriptor per line.
-        development_reqs_str = '\n'.join(requirement_lines)
-        development_reqs_file.file.write(development_reqs_str)
-        development_reqs_file.file.close()
-        conda_exec('install', '-y', '--file', development_reqs_file.name,
+        required_packages_str = '\n'.join(required_packages_lines)
+        required_packages_file.file.write(required_packages_str)
+        required_packages_file.file.close()
+        conda_exec('install', '-y', '--file', required_packages_file.name,
                    *args, verbose=verbose)
     finally:
         # Remove temporary file containing list of Conda requirements.
-        ph.path(development_reqs_file.name).remove()
+        ph.path(required_packages_file.name).remove()
 
 
 def install_info(install_response, split_version=False):
