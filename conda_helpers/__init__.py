@@ -18,6 +18,7 @@ import sys
 import tempfile as tmp
 import threading
 
+import colorama as co
 import path_helpers as ph
 import six
 
@@ -632,6 +633,10 @@ def development_setup(recipe_dir, *args, **kwargs):
 
     .. versionchanged:: 0.19
         Use :func:`render` to render recipe.
+
+    .. versionchanged:: 0.20
+       Uninstall packages corresponding to paths added with `conda develop` to
+       ensure development versions are used instead.
     '''
     verbose = kwargs.pop('verbose', True)
     recipe_dir = ph.path(recipe_dir).realpath()
@@ -688,6 +693,14 @@ def development_setup(recipe_dir, *args, **kwargs):
     finally:
         # Remove temporary file containing list of Conda requirements.
         ph.path(required_packages_file.name).remove()
+
+    # Uninstall packages corresponding to paths added with `conda develop` so
+    # development versions are used.
+    dev_packages = find_dev_packages(verbose=None if verbose is None or verbose
+                                     else False)
+    logger.info('Uninstall packages linked with `conda develop`:\n'
+                '\n'.join(dev_packages))
+    conda_exec('uninstall', '-y', '--force', *dev_packages, verbose=verbose)
 
 
 def install_info(install_response, split_version=False):
@@ -906,3 +919,51 @@ def render(recipe_dir, **kwargs):
     #  - `ERROR: The system was unable to find the specified registry key or value.`
     stdout = re.sub('^ERROR: The system.*$', '', stdout, flags=re.MULTILINE)
     return stdout
+
+
+def find_dev_packages(**kwargs):
+    '''
+    Find package names corresponding to paths added with ``conda develop``.
+
+    To do this, for each path listed in ``.../site-packages/conda.pth``:
+
+     1. If ``.conda-recipe`` directory exists within the path, render the
+        corresponding recipe.
+     2. Get the name(s) of the output package(s) from the rendered recipe.
+
+    Parameters
+    ----------
+    **kwargs
+        Keyword arguments to pass to :func:`conda_helpers.render`.
+
+    Returns
+    -------
+    list
+        List of tuples containing::
+         - ``source_path``: path listed in ``conda.pth``.
+         - ``packages``: tuple of package names listed in rendered recipe.
+
+
+    .. versionadded:: 0.20
+    '''
+    conda_pth = conda_prefix().joinpath('Lib', 'site-packages', 'conda.pth')
+    dev_package_names = []
+
+    for dev_path_i in [ph.path(str.strip(p)) for p in conda_pth.lines()]:
+        recipe_dir_i = dev_path_i.joinpath('.conda-recipe')
+        if not recipe_dir_i.isdir():
+            if kwargs.get('verbose'):
+                print(co.Fore.RED + 'skipping:', co.Fore.WHITE + dev_path_i,
+                      file=sys.stderr)
+            continue
+        if kwargs.get('verbose'):
+            print(co.Fore.MAGENTA + 'processing:', co.Fore.WHITE + dev_path_i,
+                  file=sys.stderr)
+        try:
+            recipe_i = render(recipe_dir_i, **kwargs)
+            recipe_objs_i = recipe_objs(recipe_i)
+            for recipe_obj_ij in recipe_objs_i:
+                dev_package_names += [recipe_obj_ij['package']['name']]
+        except Exception as exception:
+            print('error:', exception)
+    return dev_package_names
