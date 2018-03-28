@@ -1,17 +1,18 @@
 from __future__ import absolute_import, print_function, unicode_literals
 from functools import partial
+from shutil import get_terminal_size
 import asyncio
 import io
 import itertools as it
 import subprocess as sp
 import sys
 
-import colorama as _C
+import colorama as co
 
 
-async def _read_stream(stream, callback=None):
+async def _read_stream(stream, callback=None, buffer_size=None):
     while True:
-        data = await stream.read(1)
+        data = await stream.read(buffer_size or 1)
         if data:
             if callback is not None:
                 callback(data)
@@ -26,6 +27,8 @@ async def run_command(cmd, *args, **kwargs):
     '''
     shell = kwargs.pop('shell', True)
     verbose = kwargs.pop('verbose', True)
+    buffer_size = kwargs.pop('buffer_size', io.DEFAULT_BUFFER_SIZE)
+
     if isinstance(cmd, list):
         cmd = sp.list2cmdline(cmd)
     _exec_func = (asyncio.subprocess.create_subprocess_shell
@@ -35,23 +38,50 @@ async def run_command(cmd, *args, **kwargs):
     stdout_ = io.StringIO()
     stderr_ = io.StringIO()
 
-    message = (_C.Fore.MAGENTA + 'Executing:', _C.Fore.WHITE + cmd)
+    terminal_size = get_terminal_size()
+    message = [co.Fore.MAGENTA + 'Executing:', co.Fore.WHITE + cmd]
+    if sum(map(len, message)) + 2 > terminal_size.columns:
+        cmd_len = terminal_size.columns - 2 - sum(map(len, ('...',
+                                                            message[0])))
+        message[1] = co.Fore.WHITE + cmd[:cmd_len] + '...'
     waiting_indicator = it.cycle(r'\|/-')
+
+    cmd_finished = asyncio.Event()
+
+    async def display_status():
+        '''
+        Display status while executing command.
+        '''
+        # Update no faster than `stderr` flush interval (if set).
+        update_interval = 2 * getattr(sys.stderr, 'flush_interval', .2)
+
+        while not cmd_finished.is_set():
+            print('\r' + co.Fore.WHITE + next(waiting_indicator), *message,
+                  end='', file=sys.stderr)
+            await asyncio.sleep(update_interval)
+
+        print('\r' + co.Fore.GREEN + 'Finished:', co.Fore.WHITE + cmd,
+              file=sys.stderr)
 
     def dump(output, data):
         text = data.decode('utf8')
         if verbose:
             print(text, end='')
-        elif verbose is None:
-            print('\r' + next(waiting_indicator), *message, end='',
-                  file=sys.stderr)
         output.write(text)
 
-    await asyncio.wait([_read_stream(process.stdout, partial(dump, stdout_)),
-                        _read_stream(process.stderr, partial(dump, stderr_))])
-
     if verbose is None:
-        print('\r' + _C.Fore.GREEN + 'Finished:', message[1], file=sys.stderr)
+        # Display status while executing command.
+        status_future = asyncio.ensure_future(display_status())
 
+    await asyncio.wait([_read_stream(process.stdout, partial(dump, stdout_),
+                                     buffer_size=buffer_size),
+                        _read_stream(process.stderr, partial(dump, stderr_),
+                                     buffer_size=buffer_size)])
+
+    # Notify that command has completed execution.
+    cmd_finished.set()
+    if verbose is None:
+        # Wait for status to display "Finished: ..."
+        await status_future
     return_code = await process.wait()
     return return_code, stdout_.getvalue(), stderr_.getvalue()
