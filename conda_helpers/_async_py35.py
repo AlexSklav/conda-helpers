@@ -2,7 +2,11 @@ from __future__ import absolute_import, print_function, unicode_literals
 from functools import partial
 import asyncio
 import io
+import itertools as it
 import subprocess as sp
+import sys
+
+import colorama as _C
 
 
 async def _read_stream(stream, callback=None):
@@ -16,6 +20,10 @@ async def _read_stream(stream, callback=None):
 
 
 async def run_command(cmd, *args, **kwargs):
+    '''
+    .. versionchanged:: 0.18
+        Display wait indicator if ``verbose`` is set to ``None`` (default).
+    '''
     shell = kwargs.pop('shell', True)
     verbose = kwargs.pop('verbose', True)
     if isinstance(cmd, list):
@@ -27,16 +35,23 @@ async def run_command(cmd, *args, **kwargs):
     stdout_ = io.StringIO()
     stderr_ = io.StringIO()
 
+    message = (_C.Fore.MAGENTA + 'Executing:', _C.Fore.WHITE + cmd)
+    waiting_indicator = it.cycle(r'\|/-')
+
     def dump(output, data):
         text = data.decode('utf8')
         if verbose:
             print(text, end='')
         elif verbose is None:
-            print('.', end='')
+            print('\r' + next(waiting_indicator), *message, end='',
+                  file=sys.stderr)
         output.write(text)
 
     await asyncio.wait([_read_stream(process.stdout, partial(dump, stdout_)),
                         _read_stream(process.stderr, partial(dump, stderr_))])
+
+    if verbose is None:
+        print('\r' + _C.Fore.GREEN + 'Finished:', message[1], file=sys.stderr)
 
     return_code = await process.wait()
     return return_code, stdout_.getvalue(), stderr_.getvalue()
