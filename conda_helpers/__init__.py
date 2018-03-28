@@ -629,27 +629,21 @@ def development_setup(recipe_dir, *args, **kwargs):
         See also
         --------
         https://conda.io/docs/user-guide/tasks/build-packages/define-metadata.html#outputs-section
+
+    .. versionchanged:: X.X.X
+        Use :func:`render` to render recipe.
     '''
     verbose = kwargs.pop('verbose', True)
     recipe_dir = ph.path(recipe_dir).realpath()
 
     # Extract list of build and run dependencies from Conda build recipe.
     logger.info('Extract build dependencies from Conda recipe: %s', recipe_dir)
+
     # Render recipe for the Python version of the active Conda environment.
-    # Note that `conda render` is part of the `conda-build` package, which is
-    # installed in the `root` Conda environment, which may have a different
-    # version of Python installed.
-    PY = '{0.major}.{0.minor}'.format(sys.version_info)
-
-    command = (conda_activate_command() +
-               ['&', 'python', '-m', 'conda_helpers', 'render', '-v', '--',
-                recipe_dir, '--python=' + PY])
-    returncode, stdout, stderr = with_loop(run_command)(command, shell=True,
-                                                        verbose=False)
-    recipe = stdout
-
+    recipe = render(recipe_dir)
     # Decode one or more outputs from the recipe yaml.
     recipe_objs_ = recipe_objs(recipe)
+
     # Find all `build` and `run` requirements across all outputs.
     requirements = list(it.chain(*map(find_requirements, recipe_objs_)))
     # Extract package name and version (if specified) from each requirement.
@@ -867,3 +861,48 @@ def format_install_info(unlinked, linked):
         for package_tuple_i in linked:
             print(_format_package_tuple(package_tuple_i), file=output)
     return output.getvalue()
+
+
+def render(recipe_dir, **kwargs):
+    '''
+    Render specified Conda build recipe.
+
+    Parameters
+    ----------
+    recipe_dir : str
+        Path to Conda build recipe.
+    verbose : bool, optional
+        If ``True``, display output of ``conda render`` command.
+
+        If ``False``, do not display output of ``conda render`` command.
+
+        If ``None``, display waiting indicator ``conda render`` command.
+
+
+    Returns
+    -------
+    str
+        Render recipe text.
+
+
+    .. versionadded:: X.X.X
+    '''
+    recipe_dir = ph.path(recipe_dir).realpath()
+
+    # Render recipe for the Python version of the active Conda environment.
+    # Note that `conda render` is part of the `conda-build` package, which is
+    # installed in the `root` Conda environment, which may have a different
+    # version of Python installed.
+    PY = '{0.major}.{0.minor}'.format(sys.version_info)
+
+    command = (conda_activate_command() +
+               ['&', 'python', '-m', 'conda_helpers', 'render', '-v', '--',
+                recipe_dir, '--python=' + PY])
+    returncode, stdout, stderr = with_loop(run_command)(command, shell=True,
+                                                        **kwargs)
+    # Strip extraneous output from activate script:
+    #  - `"Found VS2014 at C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools\"`
+    stdout = re.sub('^"Found VS.*$', '', stdout, flags=re.MULTILINE)
+    #  - `ERROR: The system was unable to find the specified registry key or value.`
+    stdout = re.sub('^ERROR: The system.*$', '', stdout, flags=re.MULTILINE)
+    return stdout
