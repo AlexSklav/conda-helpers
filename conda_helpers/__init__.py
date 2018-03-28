@@ -623,7 +623,7 @@ def development_setup(recipe_dir, *args, **kwargs):
         Strip build string (where necessary) from rendered recipe package
         specifiers.  Fixes `issue #4 <https://github.com/sci-bots/conda-helpers/issues/4>`_
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.18
         Add support for recipes with multiple outputs.
 
         See also

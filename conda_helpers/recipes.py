@@ -3,7 +3,7 @@ u'''
 Helper functions to process Conda recipes.
 
 
-.. versionadded:: X.X.X
+.. versionadded:: 0.18
 '''
 from __future__ import absolute_import, unicode_literals, print_function
 

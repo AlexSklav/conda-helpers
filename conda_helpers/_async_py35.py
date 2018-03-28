@@ -21,7 +21,7 @@ async def _read_stream(stream, callback=None):
 
 async def run_command(cmd, *args, **kwargs):
     '''
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.18
         Display wait indicator if ``verbose`` is set to ``None`` (default).
     '''
     shell = kwargs.pop('shell', True)
