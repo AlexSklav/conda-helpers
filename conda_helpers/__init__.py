@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# coding: utf-8
 '''
 .. versionchanged:: 0.13
     Add support for Python 3.
@@ -520,10 +520,15 @@ def conda_exec(*args, **kwargs):
 
     # Strip non-json lines from output when `--json` arg is specified.
     if '--json' in args and json_fix:
-        stdout = ''.join(line_i for line_i in stdout.splitlines()
-                         if not any(cre_j.search(line_i)
-                                    for cre_j in (cre_json_progress,
-                                                  cre_non_json)))
+        stdout = '\n'.join(line_i for line_i in stdout.splitlines()
+                           if not any(cre_j.search(line_i)
+                                      for cre_j in (cre_json_progress,
+                                                    cre_non_json)))
+        # Strip extraneous output from activate script:
+        #  - `"Found VS2014 at C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools\"`
+        stdout = re.sub('^"Found VS.*$', '', stdout, flags=re.MULTILINE)
+        #  - `ERROR: The system was unable to find the specified registry key or value.`
+        stdout = re.sub('^ERROR: The system.*$', '', stdout, flags=re.MULTILINE)
     return stdout
 
 
