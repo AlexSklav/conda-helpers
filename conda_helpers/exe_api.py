@@ -700,9 +700,8 @@ def render(recipe_dir, **kwargs):
     # version of Python installed.
     PY = '{0.major}.{0.minor}'.format(sys.version_info)
 
-    command = [conda_executable().parent.joinpath('python'), '-m',
-               'conda_helpers', 'render', '-v', '--', recipe_dir, '--python=' +
-               PY]
+    command = ['python', '-m', 'conda_helpers', 'render', '-v', '--',
+               recipe_dir, '--python=' + PY]
     returncode, stdout, stderr = with_loop(run_command)(command, shell=True,
                                                         **kwargs)
     # Strip extraneous output from activate script:

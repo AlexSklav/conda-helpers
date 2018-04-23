@@ -17,6 +17,7 @@ import path_helpers as ph
 import six
 
 import conda_helpers as ch
+import conda_helpers.exe_api
 
 
 BASE_PARSER = ArgumentParser(add_help=False)
@@ -61,7 +62,7 @@ def git_src_info(meta_path):
         return git_dir, describe, head
 
 
-@wraps(ch.conda_exec)
+@wraps(ch.exe_api.conda_exec)
 def conda_exec_memoize(*args, **kwargs):
     '''
     Memoizable
@@ -219,7 +220,7 @@ def main(args=None):
 
     # **Note: `conda_exec` function is created dynamically to use the
     # dynamically-specified memoize cache directory.**
-    conda_exec = memory.cache(ch.conda_exec)
+    conda_exec = memory.cache(ch.exe_api.conda_exec)
 
     start = dt.datetime.now()
     try:
