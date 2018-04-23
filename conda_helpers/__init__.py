@@ -588,21 +588,7 @@ def package_version(name, *args, **kwargs):
     if singleton:
         name = [name]
 
-    # Match package name(s) to filenames in `<prefix>/conda-meta` according to
-    # [Conda package naming conventions][conda-pkg-name].
-    #
-    # [conda-pkg-name]: https://conda.io/docs/user-guide/tasks/build-packages/package-naming-conv.html
-    cre_package = re.compile(r'^(?P<package_name>{})-(?P<version>.+)
-                             r'-(?P<build_string>[^\-])+$'.format('|'.join(name)),
-                             re.MULTILINE)
-
-    version_dicts = {}
-
-    for json_file_i in ch.conda_prefix().joinpath('conda-meta').files('*.json'):
-        if not cre_package.match(json_file_i.namebase):
-            continue
-        package_info_i = json.loads(json_file_i.text())
-        version_dicts[package_info_i['name']] = package_info_i
+    version_dicts = list(conda_list('|'.join(name), full_name=True).values())
 
     if not version_dicts:
         raise NameError('Package `{}` not installed.'.format(name))
@@ -989,3 +975,62 @@ def find_dev_packages(**kwargs):
         except Exception as exception:
             print('error:', exception)
     return dev_package_names
+
+
+def conda_list(regex, full_name=False):
+    '''
+    Emulate ``conda list`` command.
+
+    .. note::
+        This function **does not** require the ``conda`` executable to be
+        available on the system path.
+
+
+    .. versionadded:: X.X.X
+        Look up installed package info in ``<prefix>/conda-meta`` directory,
+        eliminating dependency on ``conda`` executable.
+
+        This is useful, for example, with Conda environments created with
+        ``conda>=4.4``, where a link to the root ``conda`` executable is no
+        longer created in the ``Scripts`` directory in the new environment.  In
+        such cases, it is not possible to locate the root ``conda`` executable
+        given only the child environment.
+
+
+    Parameters
+    ----------
+    regex : str
+        Regular expression or package name.
+    full_name : bool, optional
+        If ``True``, only search for full names, i.e., ``^<regex>$``.
+
+    Returns
+    -------
+    dict
+        Dictionary mapping each matched package name to the corresponding
+        package version information, including containing ``'name'``,
+        ``'version'``, and ``'build'``.
+    '''
+    # Match package name(s) to filenames in `<prefix>/conda-meta` according to
+    # [Conda package naming conventions][conda-pkg-name].
+    #
+    # [conda-pkg-name]: https://conda.io/docs/user-guide/tasks/build-packages/package-naming-conv.html
+    cre_package = re.compile(r'^(?P<package_name>.*)-(?P<version>[^\-]+)'
+                             r'-(?P<build_string>[^\-])+$')
+    if full_name:
+        regex = '^{}$'.format(regex)
+
+    version_dicts = {}
+
+    for json_file_i in conda_prefix().joinpath('conda-meta').files('*.json'):
+        file_match_i = cre_package.match(json_file_i.namebase)
+        if not file_match_i:
+            # Unrecognized file name format.
+            continue
+        elif not re.match(regex, file_match_i.group('package_name')):
+            # Package name does not match specified regular expression.
+            continue
+        package_info_i = json.loads(json_file_i.text())
+        version_dicts[package_info_i['name']] = package_info_i
+
+    return version_dicts
