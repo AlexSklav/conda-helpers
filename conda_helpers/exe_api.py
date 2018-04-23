@@ -19,7 +19,7 @@ import colorama as co
 import path_helpers as ph
 import whichcraft
 
-from . import conda_prefix
+from . import conda_list, conda_prefix
 from .asyncio_util import run_command, with_loop
 from .recipes import recipe_objs, find_requirements
 
@@ -280,6 +280,13 @@ def conda_version_info(package_name, channels=None):
         If `conda search` command fails.
 
         This happens, for example, if no internet connection is available.
+
+
+    .. versionchanged:: X.X.X
+        Use :func:`conda_list` to check for currently installed version of
+        package.  This is necessary since format of ``conda search`` has
+        changed and no longer uses a ``*`` to indicate the currently installed
+        version.
     '''
     if channels is None:
         channels_args = []
@@ -296,10 +303,8 @@ def conda_version_info(package_name, channels=None):
     versions = [tokens_i[2] if tokens_i[1] in ('*', '.') else tokens_i[1]
                 for tokens_i in line_tokens]
 
-    installed_indexes = [i for i, tokens_i in enumerate(line_tokens)
-                         if tokens_i[1] == '*']
-    installed_version = (None if not installed_indexes
-                         else versions[installed_indexes[0]])
+    installed_version = conda_list(package_name).get(package_name,
+                                                     {}).get('version')
     return {'installed': installed_version, 'versions': versions}
 
 
