@@ -549,6 +549,17 @@ def package_version(name, *args, **kwargs):
         This is useful, for example, for code to continue processing packages
         that **are** found.
 
+    .. versionchanged:: X.X.X
+        Look up installed package info in ``<prefix>/conda-meta`` directory,
+        eliminating dependency on ``conda`` executable.
+
+        This is useful, for example, with Conda environments created with
+        ``conda>=4.4``, where a link to the root ``conda`` executable is no
+        longer created in the ``Scripts`` directory in the new environment.  In
+        such cases, it is not possible to locate the root ``conda`` executable
+        given only the child environment.
+
+
     Parameters
     ----------
     name : str or list
@@ -561,8 +572,8 @@ def package_version(name, *args, **kwargs):
     Returns
     -------
     dict or list
-        Dictionary (or dictionaries) containing ``'name'``, ``'version'``,
-        ``'features'``, ``'features'``, and ``'build'``.
+        Dictionary (or dictionaries) containing ``'name'``, ``'version'``, and
+        ``'build'``.
 
         If multiple package names were specified in :data:`name` argument, the
         order of the list of version dictionaries is the same as the order of
@@ -577,16 +588,22 @@ def package_version(name, *args, **kwargs):
     if singleton:
         name = [name]
 
-    # Use `conda_exec` since
-    versions_js = conda_exec('list', '--json',
-                             # XXX Add `' ?'` to force Windows to quote
-                             # argument due to a space.
-                             #
-                             # The argument **MUST** be quoted since it may
-                             # contain a pipe character (i.e., `|`).
-                             '^({}) ?$'.format('|'.join(name)), *args,
-                             **kwargs)
-    version_dicts = json.loads(versions_js)
+    # Match package name(s) to filenames in `<prefix>/conda-meta` according to
+    # [Conda package naming conventions][conda-pkg-name].
+    #
+    # [conda-pkg-name]: https://conda.io/docs/user-guide/tasks/build-packages/package-naming-conv.html
+    cre_package = re.compile(r'^(?P<package_name>{})-(?P<version>.+)
+                             r'-(?P<build_string>[^\-])+$'.format('|'.join(name)),
+                             re.MULTILINE)
+
+    version_dicts = {}
+
+    for json_file_i in ch.conda_prefix().joinpath('conda-meta').files('*.json'):
+        if not cre_package.match(json_file_i.namebase):
+            continue
+        package_info_i = json.loads(json_file_i.text())
+        version_dicts[package_info_i['name']] = package_info_i
+
     if not version_dicts:
         raise NameError('Package `{}` not installed.'.format(name))
 
