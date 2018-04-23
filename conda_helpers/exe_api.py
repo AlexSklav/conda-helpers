@@ -1,6 +1,6 @@
 # coding: utf-8
 '''
-.. versionadded:: X.X.X
+.. versionadded:: 0.21
 
 This module contains functions that require a `conda` executable to be
 available on the system path.
@@ -81,7 +81,7 @@ def conda_executable():
     '''
     .. versionadded:: 0.2.post5
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.21
         Search for first Conda executable on system path.
 
         This adds support for Conda environments created with ``conda>=4.4``,
@@ -107,7 +107,9 @@ def conda_root():
     '''
     .. versionadded:: 0.3.post2
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.21
+        Look up ``conda`` executable path using :func:`conda_executable`.
+
 
     Returns
     -------
@@ -131,7 +133,7 @@ def conda_activate_command():
         Conda environment corresponding to the running Python executable.
 
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.21
         Search for first ``activate`` executable on system path.
 
         This adds support for Conda environments created with ``conda>=4.4``,
@@ -282,7 +284,7 @@ def conda_version_info(package_name, channels=None):
         This happens, for example, if no internet connection is available.
 
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.21
         Use :func:`conda_list` to check for currently installed version of
         package.  This is necessary since format of ``conda search`` has
         changed and no longer uses a ``*`` to indicate the currently installed
@@ -695,7 +697,8 @@ def render(recipe_dir, **kwargs):
 
     .. versionadded:: 0.19
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.21
+        Use first ``python`` executable found on the system path.
     '''
     recipe_dir = ph.path(recipe_dir).realpath()
 

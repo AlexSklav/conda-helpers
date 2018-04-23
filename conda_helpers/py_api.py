@@ -1,3 +1,8 @@
+# coding: utf-8
+'''
+.. versionadded:: 0.21
+'''
+from __future__ import absolute_import, print_function, unicode_literals
 import json
 import logging
 import re
@@ -83,7 +88,7 @@ def package_version(name, *args, **kwargs):
         This is useful, for example, for code to continue processing packages
         that **are** found.
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.21
         Look up installed package info in ``<prefix>/conda-meta`` directory,
         eliminating dependency on ``conda`` executable.
 
@@ -152,7 +157,7 @@ def conda_list(regex, full_name=False):
         available on the system path.
 
 
-    .. versionadded:: X.X.X
+    .. versionadded:: 0.21
         Look up installed package info in ``<prefix>/conda-meta`` directory,
         eliminating dependency on ``conda`` executable.
 

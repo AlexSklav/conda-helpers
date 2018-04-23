@@ -34,7 +34,7 @@ requirements:
     - six
     #: .. versionadded:: 0.15
     - trollius
-    #: .. versionadded:: X.X.X
+    #: .. versionadded:: 0.21
     - whichcraft
 
   run:
@@ -50,7 +50,7 @@ requirements:
     - six
     #: .. versionadded:: 0.15
     - trollius
-    #: .. versionadded:: X.X.X
+    #: .. versionadded:: 0.21
     - whichcraft
 
 test:

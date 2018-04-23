@@ -2,6 +2,9 @@
 '''
 .. versionchanged:: 0.13
     Add support for Python 3.
+
+.. versionchanged:: 0.21
+    Add support for ``conda>=4.4``.
 '''
 from __future__ import absolute_import, print_function, unicode_literals
 
