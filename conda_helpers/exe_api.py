@@ -491,9 +491,11 @@ def development_setup(recipe_dir, *args, **kwargs):
     # development versions are used.
     dev_packages = find_dev_packages(verbose=None if verbose is None or verbose
                                      else False)
-    logger.info('Uninstall packages linked with `conda develop`:\n'
-                '\n'.join(dev_packages))
-    conda_exec('uninstall', '-y', '--force', *dev_packages, verbose=verbose)
+    if dev_packages:
+        logger.info('Uninstall packages linked with `conda develop`:\n'
+                    '\n'.join(dev_packages))
+        conda_exec('uninstall', '-y', '--force', *dev_packages,
+                   verbose=verbose)
 
 
 def install_info(install_response, split_version=False):
