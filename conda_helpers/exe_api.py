@@ -19,8 +19,8 @@ import colorama as co
 import path_helpers as ph
 import whichcraft
 
-from . import conda_list, conda_prefix
 from .asyncio_util import run_command, with_loop
+from .py_api import conda_list, conda_prefix
 from .recipes import recipe_objs, find_requirements
 
 
