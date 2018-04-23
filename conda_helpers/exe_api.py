@@ -441,9 +441,12 @@ def development_setup(recipe_dir, *args, **kwargs):
 
     # Find all `build` and `run` requirements across all outputs.
     requirements = list(it.chain(*map(find_requirements, recipe_objs_)))
+    # If listed as both a `build` and `run` requirement use the `run`
+    # requirement specification only.
+    requirements = [list(requirements_i)[-1] for group_i, requirements_i in
+                    it.groupby(sorted(requirements, key=lambda x: (x[0], x[-1])),
+                               key=lambda x: x[0])]
     # Extract package name and version (if specified) from each requirement.
-    # XXX Do not include dependencies with wildcard version specifiers, since
-    # they are not supported by `conda install`.
     required_packages = [dict(zip(('package', 'version'), r[1].split(' ')[:2]))
                          for r in requirements]
 
