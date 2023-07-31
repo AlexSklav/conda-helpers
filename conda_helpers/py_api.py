@@ -1,23 +1,20 @@
 # coding: utf-8
-'''
-.. versionadded:: 0.21
-'''
-from __future__ import absolute_import, print_function, unicode_literals
 import json
-import logging
+import six
 import re
 import sys
+import logging
 
 import path_helpers as ph
-import six
 
+from typing import List, Union, Dict
 
 logger = logging.getLogger(__name__)
 
 
 class PackageNotFound(Exception):
-    def __init__(self, missing, available=None):
-        '''
+    def __init__(self, missing: Union[str, List[str]], available: Union[str, List[Dict[str, str]]] = None):
+        """
         Parameters
         ----------
         missing : str or list
@@ -28,7 +25,7 @@ class PackageNotFound(Exception):
 
             Useful, for example, for code to continue processing packages that
             **are** found.
-        '''
+        """
         if isinstance(missing, six.string_types):
             self.missing = [missing]
         else:
@@ -40,20 +37,18 @@ class PackageNotFound(Exception):
         else:
             self.available = available
 
-    def __str__(self):
+    def __str__(self) -> str:
         if len(self.missing) > 1:
-            return ('The following package(s) could not be found: {}'
-                    .format(', '.join('`{}`'.format(package_i)
-                                      for package_i in self.missing)))
+            return ("The following packages could not be found: {}"
+                    .format(', '.join(f'`{package_i}`' for package_i in self.missing)))
         elif self.missing:
-            return ('Package `{}` could not be found.'
-                    .format(self.missing[0]))
+            return f"Package `{self.missing[0]}` could not be found."
         else:
-            return 'Package not found.'
+            return "Package not found."
 
 
-def conda_prefix():
-    '''
+def conda_prefix() -> ph.path:
+    """
     Returns
     -------
     path_helpers.path
@@ -62,43 +57,19 @@ def conda_prefix():
 
         Return ``None`` if not running in a Conda environment.
 
+    Version log
+    -----------
     .. versionchanged:: 0.12.4
         Use :attr:`sys.prefix` to look up Conda environment prefix.
 
     .. versionchanged:: 0.13
         Cast :attr:`sys.prefix` as a :class:`path_helpers.path` instance.
-    '''
+    """
     return ph.path(sys.prefix)
 
 
-def package_version(name, *args, **kwargs):
-    '''
-    .. versionchanged:: 0.8
-        Accept extra :data:`args` and :data`kwargs`.
-
-    .. versionchanged:: 0.12
-        Raise :class:`PackageNotFound` error if one or more specified packages
-        could not be found.
-
-        Note that the ``available`` attribute of the raised
-        :class:`PackageNotFound` object contains a list of package information
-        dictionaries of the set of specified packages that **are** available
-        Conda packages.
-
-        This is useful, for example, for code to continue processing packages
-        that **are** found.
-
-    .. versionchanged:: 0.21
-        Look up installed package info in ``<prefix>/conda-meta`` directory,
-        eliminating dependency on ``conda`` executable.
-
-        This is useful, for example, with Conda environments created with
-        ``conda>=4.4``, where a link to the root ``conda`` executable is no
-        longer created in the ``Scripts`` directory in the new environment.  In
-        such cases, it is not possible to locate the root ``conda`` executable
-        given only the child environment.
-
-
+def package_version(name: Union[str, List[str]], *args, **kwargs) -> Union[Dict[str, str], List[Dict[str, str]]]:
+    """
     Parameters
     ----------
     name : str or list
@@ -121,43 +92,27 @@ def package_version(name, *args, **kwargs):
     Raises
     ------
     PackageNotFound
+
+
         If one or more specified packages could not be found.
-    '''
-    singleton = isinstance(name, six.string_types)
-    if singleton:
-        name = [name]
+       .. versionchanged:: 0.8
+        Accept extra :data:`args` and :data`kwargs`.
 
-    version_dicts = list(conda_list('|'.join(name), full_name=True).values())
+    Version log
+    -----------
+    .. versionchanged:: 0.12
+        Raise :class:`PackageNotFound` error if one or more specified packages
+        could not be found.
 
-    if not version_dicts:
-        raise NameError('Package `{}` not installed.'.format(name))
+        Note that the ``available`` attribute of the raised
+        :class:`PackageNotFound` object contains a list of package information
+        dictionaries of the set of specified packages that **are** available
+        Conda packages.
 
-    if singleton:
-        return version_dicts[0]
-    else:
-        # Return list of version dictionaries in same order as names where
-        # specified in `name` argument.
-        versions_dict = dict([(version_i['name'], version_i)
-                              for version_i in version_dicts])
-        missing = [name_i for name_i in name if name_i not in versions_dict]
-        available = [versions_dict[name_i] for name_i in name
-                     if name_i not in missing]
-        if missing:
-            raise PackageNotFound(missing, available=available)
-        else:
-            return available
+        This is useful, for example, for code to continue processing packages
+        that **are** found.
 
-
-def conda_list(regex, full_name=False):
-    '''
-    Emulate ``conda list`` command.
-
-    .. note::
-        This function **does not** require the ``conda`` executable to be
-        available on the system path.
-
-
-    .. versionadded:: 0.21
+    .. versionchanged:: 0.21
         Look up installed package info in ``<prefix>/conda-meta`` directory,
         eliminating dependency on ``conda`` executable.
 
@@ -166,7 +121,35 @@ def conda_list(regex, full_name=False):
         longer created in the ``Scripts`` directory in the new environment.  In
         such cases, it is not possible to locate the root ``conda`` executable
         given only the child environment.
+    """
+    singleton = isinstance(name, six.string_types)
+    if singleton:
+        name = [name]
 
+    version_dicts = list(conda_list('|'.join(name), full_name=True).values())
+
+    if not version_dicts:
+        raise NameError(f'Package `{name}` not installed.')
+
+    if singleton:
+        return version_dicts[0]
+    else:
+        # Return list of version dictionaries in same order as names where
+        # specified in `name` argument.
+        versions_dict = dict([(version_i['name'], version_i) for version_i in version_dicts])
+        missing = [name_i for name_i in name if name_i not in versions_dict]
+        available = [versions_dict[name_i] for name_i in name if name_i not in missing]
+        if missing:
+            raise PackageNotFound(missing, available=available)
+        else:
+            return available
+
+
+def conda_list(regex: str, full_name: bool = False) -> Dict[str, Dict[str, str]]:
+    """
+    Emulate ``conda list`` command.
+
+    Note:: This function **does not** require the ``conda`` executable to be available on the system path.
 
     Parameters
     ----------
@@ -181,7 +164,19 @@ def conda_list(regex, full_name=False):
         Dictionary mapping each matched package name to the corresponding
         package version information, including containing ``'name'``,
         ``'version'``, and ``'build'``.
-    '''
+
+    Version log
+    -----------
+    .. versionadded:: 0.21
+    Look up installed package info in ``<prefix>/conda-meta`` directory,
+    eliminating dependency on ``conda`` executable.
+
+    This is useful, for example, with Conda environments created with
+    ``conda>=4.4``, where a link to the root ``conda`` executable is no
+    longer created in the ``Scripts`` directory in the new environment.  In
+    such cases, it is not possible to locate the root ``conda`` executable
+    given only the child environment.
+    """
     # Match package name(s) to filenames in `<prefix>/conda-meta` according to
     # [Conda package naming conventions][conda-pkg-name].
     #
@@ -189,7 +184,7 @@ def conda_list(regex, full_name=False):
     cre_package = re.compile(r'^(?P<package_name>.*)-(?P<version>[^\-]+)'
                              r'-(?P<build_string>[^\-])+$')
     if full_name:
-        regex = '^{}$'.format(regex)
+        regex = f'^{regex}$'
 
     version_dicts = {}
 

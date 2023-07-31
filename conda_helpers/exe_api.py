@@ -1,23 +1,22 @@
 # coding: utf-8
-'''
-.. versionadded:: 0.21
-
+"""
 This module contains functions that require a `conda` executable to be
 available on the system path.
-'''
-from __future__ import absolute_import, print_function, unicode_literals
-import itertools as it
+"""
+import sys
+import re
 import io
 import logging
 import platform
-import re
-import sys
+import whichcraft
+
+import itertools as it
 import subprocess as sp
 import tempfile as tmp
-
 import colorama as co
 import path_helpers as ph
-import whichcraft
+
+from typing import List, Dict, Union, Optional, Tuple
 
 from .asyncio_util import run_command, with_loop
 from .py_api import conda_list, conda_prefix
@@ -26,7 +25,7 @@ from .recipes import recipe_objs, find_requirements
 
 logger = logging.getLogger(__name__)
 
-'''
+"""
 .. versionadded:: 0.12.3
 
 Match progress messages from Conda install output log.
@@ -36,11 +35,12 @@ For example:
     {"maxval": 133256, "finished": false, "fetch": "microdrop-laun", "progress": 0}
 
 See `issue #5 <https://github.com/sci-bots/conda-helpers/issues/5>`_.
-'''
+"""
+
 cre_json_progress = re.compile(r'{"maxval":[^,]+,\s+"finished":[^,]+,'
                                r'\s+"fetch":\s+[^,]+,\s+"progress":[^}]+}')
 
-'''
+"""
 .. versionadded:: 0.12.3
 
 Match non-JSON messages, e.g., `Conda menuinst log messages <https://github.com/ContinuumIO/menuinst/issues/49>`_.
@@ -54,7 +54,8 @@ See also
 https://groups.google.com/a/continuum.io/forum/#!topic/anaconda/RWs9of4I2KM
 
 https://github.com/sci-bots/conda-helpers/issues/5
-'''
+"""
+
 cre_non_json = re.compile(r'^\w')
 
 
@@ -62,8 +63,8 @@ class NotInstalled(Exception):
     pass
 
 
-def f_major_version(version):
-    '''
+def f_major_version(version: str) -> int:
+    """
     Parameters
     ----------
     version : str
@@ -73,12 +74,19 @@ def f_major_version(version):
     -------
     int
         Number before first dot in version string (i.e., major version number).
-    '''
+    """
     return int(version.split('.')[0])
 
 
-def conda_executable():
-    '''
+def conda_executable() -> ph.path:
+    """
+    Returns
+    -------
+    path_helpers.path
+        Path to Conda executable.
+
+    Version log
+    -----------
     .. versionadded:: 0.2.post5
 
     .. versionchanged:: 0.21
@@ -89,13 +97,7 @@ def conda_executable():
         the ``Scripts`` directory in the new environment.  In such cases, it is
         not possible to locate the root ``conda`` executable given only the
         child environment.
-
-
-    Returns
-    -------
-    path_helpers.path
-        Path to Conda executable.
-    '''
+    """
     conda_exe = whichcraft.which('conda')
     if conda_exe is None:
         raise IOError('Could not locate `conda` executable.')
@@ -103,27 +105,25 @@ def conda_executable():
         return ph.path(conda_exe)
 
 
-def conda_root():
-    '''
-    .. versionadded:: 0.3.post2
-
-    .. versionchanged:: 0.21
-        Look up ``conda`` executable path using :func:`conda_executable`.
-
-
+def conda_root() -> ph.path:
+    """
     Returns
     -------
     path_helpers.path
         Path to Conda **root** environment.
-    '''
-    return ph.path(sp.check_output([conda_executable(), 'info', '--root'],
-                                   shell=True).strip())
 
-
-def conda_activate_command():
-    '''
+    Version log
+    -----------
     .. versionadded:: 0.3.post2
 
+    .. versionchanged:: 0.21
+        Look up ``conda`` executable path using :func:`conda_executable`.
+    """
+    return ph.path(sp.check_output([conda_executable(), 'info', '--root'], shell=False).strip().decode())
+
+
+def conda_activate_command() -> List[str]:
+    """
     Returns
     -------
     list
@@ -132,6 +132,9 @@ def conda_activate_command():
         Can be prepended to a command list to run the command in the activated
         Conda environment corresponding to the running Python executable.
 
+    Version log
+    -----------
+    .. versionadded:: 0.3.post2
 
     .. versionchanged:: 0.21
         Search for first ``activate`` executable on system path.
@@ -139,15 +142,16 @@ def conda_activate_command():
         This adds support for Conda environments created with ``conda>=4.4``,
         where a link to the root ``activate`` executable is no longer created
         in the ``Scripts`` directory in the new environment.
-    '''
+    """
     activate_exe = whichcraft.which('activate')
     if activate_exe is None:
         raise IOError('Could not locate Conda `activate` executable.')
     return ['call', activate_exe, conda_prefix()]
 
 
-def conda_upgrade(package_name, match_major_version=False, channels=None):
-    '''
+def conda_upgrade(package_name: str, match_major_version: bool = False,
+                  channels: Optional[List[str]] = None) -> Dict[str, Union[str, List[Dict[str, str]]]]:
+    """
     Upgrade Conda package.
 
     Parameters
@@ -185,11 +189,12 @@ def conda_upgrade(package_name, match_major_version=False, channels=None):
     --------
     :func:`pip_helpers.upgrade`
 
-
+    Version log
+    -----------
     .. versionchanged:: 0.15
         Use asynchronous :func:`run_command` coroutine to better stream
         ``stdout`` and ``stderr``.
-    '''
+    """
     result = {'package': package_name,
               'original_version': None,
               'new_version': None,
@@ -227,13 +232,11 @@ def conda_upgrade(package_name, match_major_version=False, channels=None):
         channels_args = list(it.chain(*[['-c', c] for c in channels]))
     # Running in a Conda environment.
     command = (['conda', 'install'] + channels_args +
-               ['-y', '{}=={}'.format(package_name, latest_version)])
-    returncode, stdout, stderr = with_loop(run_command)(command, shell=True,
-                                                        verbose=True)
+               ['-y', f'{package_name}=={latest_version}'])
+    returncode, stdout, stderr = with_loop(run_command)(command, shell=False, verbose=True)
     if returncode != 0:
-        message = ('Error executing: `{}`.\nstdout\n------\n\n{}\n\n'
-                   'stderr\n------\n\n{}'.format(sp.list2cmdline(command),
-                                                 stdout, stderr))
+        message = (f'Error executing: `{sp.list2cmdline(command)}`.\nstdout\n------\n\n{stdout}\n\n'
+                   f'stderr\n------\n\n{stderr}')
         logger.error(message)
         raise RuntimeError(message)
 
@@ -257,8 +260,8 @@ def conda_upgrade(package_name, match_major_version=False, channels=None):
     return result
 
 
-def conda_version_info(package_name, channels=None):
-    '''
+def conda_version_info(package_name: str, channels: Optional[List[str]] = None) -> Dict[str, Union[str, List[str]]]:
+    """
     Parameters
     ----------
     package_name : str
@@ -284,36 +287,48 @@ def conda_version_info(package_name, channels=None):
         This happens, for example, if no internet connection is available.
 
 
+    Version log
+    -----------
     .. versionchanged:: 0.21
         Use :func:`conda_list` to check for currently installed version of
         package.  This is necessary since format of ``conda search`` has
         changed and no longer uses a ``*`` to indicate the currently installed
         version.
-    '''
+    """
     if channels is None:
         channels_args = []
     else:
         channels_args = list(it.chain(*[['-c', c] for c in channels]))
     # Use `-f` flag to search for package, but *no other packages that have
     # `<package_name>` in the name*.
-    output = sp.check_output([conda_executable(), 'search'] + channels_args +
-                             ['-f', package_name], shell=True)
+    output = sp.check_output([conda_executable(), 'search'] + channels_args + ['-f', package_name], shell=False)
 
     output_lines = output.strip().splitlines()
 
-    line_tokens = [re.split(r'\s+', v) for v in output_lines[1:]]
-    versions = [tokens_i[2] if tokens_i[1] in ('*', '.') else tokens_i[1]
-                for tokens_i in line_tokens]
+    line_tokens = [re.split(r'\s+', v.decode()) for v in output_lines[1:]]
+    versions = [tokens_i[2] if tokens_i[1] in ('*', '.') else tokens_i[1] for tokens_i in line_tokens]
 
-    installed_version = conda_list(package_name).get(package_name,
-                                                     {}).get('version')
+    installed_version = conda_list(package_name).get(package_name, {}).get('version')
     return {'installed': installed_version, 'versions': versions}
 
 
-def conda_exec(*args, **kwargs):
-    r'''
+def conda_exec(*args, **kwargs) -> str:
+    r"""
     Execute command using ``conda`` executable in active Conda environment.
 
+    Parameters
+    ----------
+    *args : list(str)
+        Command line arguments to pass to ``conda`` executable.
+
+    Returns
+    -------
+    str
+        Output from command (both ``stdout`` and ``stderr``).
+
+
+    Version log
+    -----------
     .. versionchanged:: 0.7.3
         Do not escape ``<``, ``>`` characters in ``conda_exec``, since these
         characters are required for less than or greater than version
@@ -338,21 +353,10 @@ def conda_exec(*args, **kwargs):
 
         See `issue #5 <https://github.com/sci-bots/conda-helpers/issues/5>`_.
 
-    Parameters
-    ----------
-    *args : list(str)
-        Command line arguments to pass to ``conda`` executable.
-
-    Returns
-    -------
-    str
-        Output from command (both ``stdout`` and ``stderr``).
-
-
     .. versionchanged:: 0.15
         Use asynchronous :func:`run_command` coroutine to better stream
         ``stdout`` and ``stderr``.
-    '''
+    """
     verbose = kwargs.get('verbose')
 
     # By default, strip non-json lines from output when `--json` arg is
@@ -369,22 +373,18 @@ def conda_exec(*args, **kwargs):
 
     # Running in a Conda environment.
     command = [conda_executable()] + list(args)
-    logger.debug('Executing command: `%s`', sp.list2cmdline(command))
-    returncode, stdout, stderr = with_loop(run_command)(command, shell=True,
-                                                        verbose=verbose)
+    logger.debug(f'Executing command: `{sp.list2cmdline(command)}`')
+    returncode, stdout, stderr = with_loop(run_command)(command, shell=False, verbose=verbose)
     if returncode != 0:
-        message = ('Error executing: `{}`.\nstdout\n------\n\n{}\n\n'
-                   'stderr\n------\n\n{}'.format(sp.list2cmdline(command),
-                                                 stdout, stderr))
+        message = (f'Error executing: `{sp.list2cmdline(command)}`.\nstdout\n------\n\n{stdout}\n\n'
+                   f'stderr\n------\n\n{stderr}')
         logger.error(message)
         raise RuntimeError(message)
 
     # Strip non-json lines from output when `--json` arg is specified.
     if '--json' in args and json_fix:
         stdout = '\n'.join(line_i for line_i in stdout.splitlines()
-                           if not any(cre_j.search(line_i)
-                                      for cre_j in (cre_json_progress,
-                                                    cre_non_json)))
+                           if not any(cre_j.search(line_i) for cre_j in (cre_json_progress, cre_non_json)))
         # Strip extraneous output from activate script:
         #  - `"Found VS2014 at C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools\"`
         stdout = re.sub('^"Found VS.*$', '', stdout, flags=re.MULTILINE)
@@ -393,8 +393,8 @@ def conda_exec(*args, **kwargs):
     return stdout
 
 
-def development_setup(recipe_dir, *args, **kwargs):
-    '''
+def development_setup(recipe_dir: str, *args, **kwargs) -> None:
+    """
     Install build and run-time dependencies for specified Conda build recipe.
 
     Parameters
@@ -412,6 +412,8 @@ def development_setup(recipe_dir, *args, **kwargs):
         ``conda install`` command.
 
 
+    Version log
+    -----------
     .. versionchanged:: 0.13.1
         Strip build string (where necessary) from rendered recipe package
         specifiers.  Fixes `issue #4 <https://github.com/sci-bots/conda-helpers/issues/4>`_
@@ -429,12 +431,12 @@ def development_setup(recipe_dir, *args, **kwargs):
     .. versionchanged:: 0.20
        Uninstall packages corresponding to paths added with `conda develop` to
        ensure development versions are used instead.
-    '''
+    """
     verbose = kwargs.pop('verbose', True)
     recipe_dir = ph.path(recipe_dir).realpath()
 
     # Extract list of build and run dependencies from Conda build recipe.
-    logger.info('Extract build dependencies from Conda recipe: %s', recipe_dir)
+    logger.info(f'Extract build dependencies from Conda recipe: {recipe_dir}')
 
     # Render recipe for the Python version of the active Conda environment.
     recipe = render(recipe_dir)
@@ -463,21 +465,14 @@ def development_setup(recipe_dir, *args, **kwargs):
             req_i['version'] = '==' + req_i['version']
 
     # Dump sorted list of required packages.
-    required_strs = sorted('  {}{}'.format(r['package'],
-                                           ' {}'.format(r['version']
-                                                        if 'version' in r
-                                                        else ''))
-                           for r in required_packages)
-    logger.info('Install build and run-time dependencies:\n%s',
-                '\n'.join(required_strs))
+    required_strs = sorted(f"  {r['package']}{r['version'] if 'version' in r else ''}" for r in required_packages)
+    logger.info('Install build and run-time dependencies:\n', '\n'.join(required_strs))
 
     # Dump list of Conda requirements to a file and install dependencies using
     # `conda install ...`.
-    required_packages_file = tmp.TemporaryFile(mode='w', prefix='%s-dev-req-' %
-                                               recipe_dir.name, delete=False)
-    required_packages_lines = ['{} {}'.format(req_i['package'],
-                                              req_i.get('version', '')).strip()
-                               for req_i in required_packages]
+    required_packages_file = tmp.TemporaryFile(mode='w', prefix=f'{recipe_dir.name}-dev-req-', delete=False)
+    required_packages_lines = [f"{req_i['package']} {req_i.get('version', '')}".strip() for req_i in required_packages]
+
     try:
         # Create string containing one package descriptor per line.
         required_packages_str = '\n'.join(required_packages_lines)
@@ -491,28 +486,16 @@ def development_setup(recipe_dir, *args, **kwargs):
 
     # Uninstall packages corresponding to paths added with `conda develop` so
     # development versions are used.
-    dev_packages = find_dev_packages(verbose=None if verbose is None or verbose
-                                     else False)
+    dev_packages = find_dev_packages(verbose=None if verbose is None or verbose else False)
     if dev_packages:
-        logger.info('Uninstall packages linked with `conda develop`:\n'
-                    '\n'.join(dev_packages))
-        conda_exec('uninstall', '-y', '--force', *dev_packages,
-                   verbose=verbose)
+        logger.info('Uninstall packages linked with `conda develop`:\n', '\n'.join(dev_packages))
+        conda_exec('uninstall', '-y', '--force', *dev_packages, verbose=verbose)
 
 
-def install_info(install_response, split_version=False):
-    '''
+def install_info(install_response: Dict, split_version: bool = False) -> Tuple[List, List]:
+    """
     Normalize ``conda install ...`` output, whether run in dry mode or not, to
     return a list of unlinked packages and a list of linked packages.
-
-    .. versionadded:: 0.7
-
-    .. versionchanged:: 0.7.3
-        Handle install log actions as :class:`dict` or :class:`list`.
-
-    .. versionchanged:: 0.11
-        Optionally split package specifier string into package name and
-        version.
 
     Parameters
     ----------
@@ -550,36 +533,45 @@ def install_info(install_response, split_version=False):
     ------
     RuntimeError
         If install response does not include item with key ``'success'``.
-    '''
-    def f_format_version(v):
-        return '{}=={}'.format(v['name'], v['version'])
+
+    Version log
+    -----------
+    .. versionadded:: 0.7
+
+    .. versionchanged:: 0.7.3
+        Handle install log actions as :class:`dict` or :class:`list`.
+
+    .. versionchanged:: 0.11
+        Optionally split package specifier string into package name and
+        version.
+    """
+
+    def f_format_version(v: Dict) -> str:
+        return f"{v['name']}=={v['version']}"
 
     if not install_response.get('success'):
         raise RuntimeError('Install operation failed.')
     if 'actions' not in install_response:
         return None, None
+
     # Read list of actions from response.
     actions = install_response['actions']
     if isinstance(actions, list):
         actions = actions[0]
     if isinstance(install_response['actions'], list):
         # Response was from a dry run.  It has a different format.
-        unlink_packages = [[f_format_version(v), v['channel']]
-                           for v in actions.get('UNLINK', [])]
-        link_packages = [[f_format_version(v), v['channel']]
-                         for v in actions.get('LINK', [])]
+        unlink_packages = [[f_format_version(v), v['channel']] for v in actions.get('UNLINK', [])]
+        link_packages = [[f_format_version(v), v['channel']] for v in actions.get('LINK', [])]
     else:
-        unlink_packages = [v.split('::')[::-1]
-                           for v in actions.get('UNLINK', [])]
-        link_packages = [v.split('::')[::-1]
-                         for v in actions.get('LINK', [])]
+        unlink_packages = [v.split('::')[::-1] for v in actions.get('UNLINK', [])]
+        link_packages = [v.split('::')[::-1] for v in actions.get('LINK', [])]
 
     # Sort list of packages to make output deterministic.
     sorted_unlinked = sorted(unlink_packages)
     sorted_linked = sorted(link_packages)
 
-    def _split_version(package_tuples):
-        '''
+    def _split_version(package_tuples: List) -> List:
+        """
         Parameters
         ----------
         package_tuples : list
@@ -592,7 +584,7 @@ def install_info(install_response, split_version=False):
             List of package tuples of the form ``(<package name>, <version>,
             <channel>)``, i.e., the :data:`package_tuples` with the package
             name and version number split apart.
-        '''
+        """
         return [(package_i.split('==') if '==' in package_i
                  else ['-'.join(package_i.split('-')[:-2]),
                        package_i.split('-')[-2]]) + [channel_i]
@@ -604,8 +596,8 @@ def install_info(install_response, split_version=False):
         return sorted_unlinked, sorted_linked
 
 
-def format_install_info(unlinked, linked):
-    '''
+def format_install_info(unlinked: Optional[List], linked: Optional[List]) -> str:
+    """
     Format output of :func:`install_info` into human-readable form.
 
     For example:
@@ -616,12 +608,6 @@ def format_install_info(unlinked, linked):
         Installed:
          - `foobar==1.7` (from `sci-bots`)
          - `bar==1.7` (from `conda-forge`)
-
-    .. versionadded:: 0.9
-
-    .. versionchanged:: 0.12.1
-        Implement handling :func:`install_info` output where
-        :data:`split_version` set to ``True``.
 
     Parameters
     ----------
@@ -637,11 +623,19 @@ def format_install_info(unlinked, linked):
     -------
     str
         Formatted output of :func:`install_info`.
-    '''
+
+    Version log
+    -----------
+    .. versionadded:: 0.9
+
+    .. versionchanged:: 0.12.1
+        Implement handling :func:`install_info` output where
+        :data:`split_version` set to ``True``.
+    """
     output = io.BytesIO()
 
-    def _format_package_tuple(package_tuple):
-        '''
+    def _format_package_tuple(package_tuple: Tuple) -> str:
+        """
         Parameters
         ----------
         package_tuple : tuple
@@ -652,14 +646,14 @@ def format_install_info(unlinked, linked):
         See also
         --------
         :func:`install_info`
-        '''
+        """
         if len(package_tuple) == 2:
             package_i, channel_i = package_tuple
-            return ' - `{}` (from `{}`)'.format(package_i, channel_i)
+            return f' - `{package_i}` (from `{channel_i}`)'
         elif len(package_tuple) == 3:
             package_i, version_i, channel_i = package_tuple
-            return ' - `{}=={}` (from `{}`)'.format(package_i, version_i,
-                                                    channel_i)
+            return f' - `{package_i}=={version_i}` (from `{channel_i}`)'
+
     if unlinked:
         print('Uninstalled:', file=output)
         for package_tuple_i in linked:
@@ -670,16 +664,16 @@ def format_install_info(unlinked, linked):
         print('Installed:', file=output)
         for package_tuple_i in linked:
             print(_format_package_tuple(package_tuple_i), file=output)
-    return output.getvalue()
+    return output.getvalue().decode()
 
 
-def render(recipe_dir, **kwargs):
-    '''
+def render(recipe_dir: Union[str, ph.path], **kwargs) -> str:
+    """
     Render specified Conda build recipe.
 
     Parameters
     ----------
-    recipe_dir : str
+    recipe_dir : str or path object
         Path to Conda build recipe.
     verbose : bool, optional
         If ``True``, display output of ``conda render`` command.
@@ -695,23 +689,23 @@ def render(recipe_dir, **kwargs):
         Render recipe text.
 
 
+    Version log
+    -----------
     .. versionadded:: 0.19
 
     .. versionchanged:: 0.21
         Use first ``python`` executable found on the system path.
-    '''
+    """
     recipe_dir = ph.path(recipe_dir).realpath()
 
     # Render recipe for the Python version of the active Conda environment.
     # Note that `conda render` is part of the `conda-build` package, which is
     # installed in the `root` Conda environment, which may have a different
     # version of Python installed.
-    PY = '{0.major}.{0.minor}'.format(sys.version_info)
+    PY = f'{sys.version_info.major}.{sys.version_info.minor}'
 
-    command = ['python', '-m', 'conda_helpers', 'render', '-v', '--',
-               recipe_dir, '--python=' + PY]
-    returncode, stdout, stderr = with_loop(run_command)(command, shell=True,
-                                                        **kwargs)
+    command = ['python', '-m', 'conda_helpers', 'render', '-v', '--', recipe_dir, '--python=' + PY]
+    returncode, stdout, stderr = with_loop(run_command)(command, shell=False, **kwargs)
     # Strip extraneous output from activate script:
     #  - `"Found VS2014 at C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools\"`
     stdout = re.sub('^"Found VS.*$', '', stdout, flags=re.MULTILINE)
@@ -720,8 +714,8 @@ def render(recipe_dir, **kwargs):
     return stdout
 
 
-def find_dev_packages(**kwargs):
-    '''
+def find_dev_packages(**kwargs) -> List[str]:
+    """
     Find package names corresponding to paths added with ``conda develop``.
 
     To do this, for each path listed in ``.../site-packages/conda.pth``:
@@ -743,26 +737,28 @@ def find_dev_packages(**kwargs):
          - ``packages``: tuple of package names listed in rendered recipe.
 
 
+    Version log
+    -----------
     .. versionadded:: 0.20
-    '''
+    """
     conda_pth = conda_prefix().joinpath('Lib', 'site-packages', 'conda.pth')
     dev_package_names = []
+
+    verbose = kwargs.get('verbose', False)
 
     for dev_path_i in [ph.path(str.strip(p)) for p in conda_pth.lines()]:
         recipe_dir_i = dev_path_i.joinpath('.conda-recipe')
         if not recipe_dir_i.isdir():
-            if kwargs.get('verbose'):
-                print(co.Fore.RED + 'skipping:', co.Fore.WHITE + dev_path_i,
-                      file=sys.stderr)
-            continue
-        if kwargs.get('verbose'):
-            print(co.Fore.MAGENTA + 'processing:', co.Fore.WHITE + dev_path_i,
-                  file=sys.stderr)
+            if verbose:
+                print(f"{co.Fore.RED}skipping: {co.Fore.WHITE}{dev_path_i}", file=sys.stderr)
+                continue
+        if verbose:
+            print(f"{co.Fore.MAGENTA}processing: {co.Fore.WHITE}{dev_path_i}", file=sys.stderr)
         try:
             recipe_i = render(recipe_dir_i, **kwargs)
             recipe_objs_i = recipe_objs(recipe_i)
             for recipe_obj_ij in recipe_objs_i:
-                dev_package_names += [recipe_obj_ij['package']['name']]
+                dev_package_names.append(recipe_obj_ij['package']['name'])
         except Exception as exception:
             print('error:', exception)
     return dev_package_names

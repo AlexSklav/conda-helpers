@@ -1,20 +1,21 @@
 # coding: utf-8
-u'''
+"""
 condac - Execute Conda commands, reusing cached output if available.
-'''
-from __future__ import absolute_import, unicode_literals, print_function
-from argparse import ArgumentParser
-from collections import OrderedDict
-from functools import wraps
-import datetime as dt
+"""
 import re
-import subprocess as sp
 import sys
+import six
 
+import subprocess as sp
+import datetime as dt
 import colorama as _C
 import joblib as jl
 import path_helpers as ph
-import six
+
+from argparse import ArgumentParser
+from collections import OrderedDict
+from functools import wraps
+from typing import List, Tuple, Optional
 
 import conda_helpers as ch
 import conda_helpers.exe_api
@@ -29,8 +30,8 @@ BASE_PARSER.add_argument('-f', '--force', action='store_true', help='Force '
 BASE_PARSER.add_argument('-v', '--verbose', action='store_true')
 
 
-def git_src_info(meta_path):
-    '''
+def git_src_info(meta_path: str) -> Optional[Tuple[ph.path, bytes, bytes]]:
+    """
     Parameters
     ----------
     meta_path : str
@@ -41,7 +42,7 @@ def git_src_info(meta_path):
     tuple(path, git describe, HEAD hash) or None
         Return ``None`` if no ``git_url`` is specified in the ``meta.yaml``
         file.  Otherwise, return ``git`` info for recipe source.
-    '''
+    """
     meta_path = ph.path(meta_path)
     recipe_path = meta_path.parent
 
@@ -63,10 +64,10 @@ def git_src_info(meta_path):
 
 
 @wraps(ch.exe_api.conda_exec)
-def conda_exec_memoize(*args, **kwargs):
-    '''
+def conda_exec_memoize(*args, **kwargs) -> str:
+    """
     Memoizable
-    '''
+    """
     global conda_exec
 
     __file_hashes__ = kwargs.pop('__file_hashes__', tuple())
@@ -164,7 +165,7 @@ def conda_exec_memoize(*args, **kwargs):
     return output
 
 
-def main(args=None):
+def main(args: Optional[List[str]] = None) -> None:
     global conda_exec
 
     _C.init(autoreset=True)
@@ -180,9 +181,8 @@ def main(args=None):
         cmd_args = []
         parser_args = args
 
-    parser = ArgumentParser(prog='condac', epilog='Version %s' %
-                            ch.__version__, description='Cached Conda Memoized'
-                            ' Conda commands.')
+    parser = ArgumentParser(prog='condac', epilog=f'Version {ch.__version__}',
+                            description='Cached Conda Memoized Conda commands.')
     parser.add_argument('--version', action='store_true')
 
     sub = parser.add_subparsers(dest='command')
@@ -200,8 +200,7 @@ def main(args=None):
         return
 
     if not args.command:
-        parser.error('No command specified.  Must specify one of: `{}`'
-                     .format(', '.join(subparsers.keys())))
+        parser.error(f"No command specified.  Must specify one of: `{', '.join(subparsers.keys())}`")
 
     if args.verbose:
         if args.cache_dir == '-':
