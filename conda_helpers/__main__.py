@@ -4,7 +4,6 @@ condac - Execute Conda commands, reusing cached output if available.
 """
 import re
 import sys
-import six
 
 import subprocess as sp
 import datetime as dt
@@ -82,7 +81,7 @@ def conda_exec_memoize(*args, **kwargs) -> str:
     __git_revisions__ = tuple()
 
     for i, a in enumerate(args):
-        if isinstance(a, six.string_types):
+        if isinstance(a, str):
             if i > 0 and args[i - 1] == '--croot':
                 # Ignore `croot` directory.
                 continue

@@ -2,5 +2,7 @@ include setup.py
 recursive-include conda_helpers *
 recursive-exclude conda_helpers *.pyc
 recursive-exclude conda_helpers *~
+exclude .DS_Store
+recursive-exclude conda_helpers .DS_Store
 include versioneer.py
 include conda_helpers/_version.py

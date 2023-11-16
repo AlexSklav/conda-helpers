@@ -3,8 +3,10 @@
 {% else %}
 {% set GIT_VERSION = GIT_DESCRIBE_TAG[1:] %}
 {% endif %}
+{% set PKG_NAME = 'conda-helpers' %}
+{% set MODULE_NAME = PKG_NAME.replace('-', '_') %}
 package:
-  name: conda-helpers
+  name: {{ PKG_NAME }}
   version: {{ GIT_VERSION }}
 
 build:
@@ -18,7 +20,7 @@ build:
 
 requirements:
   build:
-    - python {{ python }}
+    - python >=3.8
     - backports.shutil_get_terminal_size
     - colorama
     - joblib
@@ -26,13 +28,9 @@ requirements:
     - pydash
     - pyyaml
     - ruamel.yaml
-    #: .. versionadded:: 0.13
-    - six
-    #: .. versionadded:: 0.21
     - whichcraft
-
   run:
-    - python {{ python }}
+    - python >=3.8
     - backports.shutil_get_terminal_size
     - colorama
     - git
@@ -41,18 +39,21 @@ requirements:
     - pydash
     - pyyaml
     - ruamel.yaml
-    #: .. versionadded:: 0.13
-    - six
-    #: .. versionadded:: 0.21
     - whichcraft
 
 test:
   imports:
-    - conda_helpers
+    - {{ MODULE_NAME }}
   commands:
     - condac -h
     - condac render -h
     - condac build -h
 
+about:
+  home: https://github.com/sci-bots/{{ PKG_NAME }}
+  summary: Helper functions, etc. for Conda environments.
+  license: BSD
+
 source:
-  git_url: ../
+#  git_url: ../
+  path: ..

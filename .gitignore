@@ -1,4 +1,4 @@
-*.egg-info/*
+*.egg-info
 *.o
 *.pyc
 MANIFEST
@@ -11,3 +11,5 @@ dist/*
 *.pyc
 docs/_*
 .ipynb_checkpoints/*
+# Mac crap
+.DS_Store
