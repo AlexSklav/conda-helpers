@@ -116,7 +116,9 @@ def package_version(name: Union[str, List[str]], *args, **kwargs) -> Union[Dict[
         eliminating dependency on ``conda`` executable.
 
         This is useful, for example, with Conda environments created with
+        ``conda>=4.4``, where a link to the root ``conda`` executable is no
         longer created in the ``Scripts`` directory in the new environment.  In
+        such cases, it is not possible to locate the root ``conda`` executable
         given only the child environment.
     """
     singleton = isinstance(name, str)
@@ -144,7 +146,9 @@ def package_version(name: Union[str, List[str]], *args, **kwargs) -> Union[Dict[
 
 def conda_list(regex: str, full_name: bool = False) -> Dict[str, Dict[str, str]]:
     """
+    Emulate ``conda list`` command.
 
+    Note:: This function **does not** require the ``conda`` executable to be available on the system path.
 
     Parameters
     ----------
@@ -163,14 +167,18 @@ def conda_list(regex: str, full_name: bool = False) -> Dict[str, Dict[str, str]]
     Version log
     -----------
     .. versionadded:: 0.21
-
+    Look up installed package info in ``<prefix>/conda-meta`` directory,
+    eliminating dependency on ``conda`` executable.
     This is useful, for example, with Conda environments created with
+    ``conda>=4.4``, where a link to the root ``conda`` executable is no
     longer created in the ``Scripts`` directory in the new environment.  In
+    such cases, it is not possible to locate the root ``conda`` executable
     given only the child environment.
     """
     # Match package name(s) to filenames in `<prefix>/conda-meta` according to
     # [Conda package naming conventions][conda-pkg-name].
     #
+    # [conda-pkg-name]: https://conda.io/docs/user-guide/tasks/build-packages/package-naming-conv.html
     cre_package = re.compile(r'^(?P<package_name>.*)-(?P<version>[^\-]+)'
                              r'-(?P<build_string>[^\-])+$')
     if full_name:
@@ -178,6 +186,7 @@ def conda_list(regex: str, full_name: bool = False) -> Dict[str, Dict[str, str]]
 
     version_dicts = {}
 
+    for json_file_i in conda_prefix().joinpath('conda-meta').files('*.json'):
         file_match_i = cre_package.match(json_file_i.namebase)
         if not file_match_i:
             # Unrecognized file name format.
