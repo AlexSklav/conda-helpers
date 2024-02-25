@@ -20,7 +20,7 @@ build:
 
 requirements:
   build:
-    - python >=3.8
+    - python >=3.6
     - backports.shutil_get_terminal_size
     - colorama
     - joblib
@@ -30,7 +30,7 @@ requirements:
     - ruamel.yaml
     - whichcraft
   run:
-    - python >=3.8
+    - python >=3.6
     - backports.shutil_get_terminal_size
     - colorama
     - git
