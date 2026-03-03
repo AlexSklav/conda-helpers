@@ -466,7 +466,7 @@ def development_setup(recipe_dir: str, *args, **kwargs) -> None:
 
     # Dump sorted list of required packages.
     required_strs = sorted(f"  {r['package']}{r['version'] if 'version' in r else ''}" for r in required_packages)
-    logger.info('Install build and run-time dependencies:\n', '\n'.join(required_strs))
+    logger.info('Install build and run-time dependencies:\n%s', '\n'.join(required_strs))
 
     # Dump list of Conda requirements to a file and install dependencies using
     # `conda install ...`.
@@ -488,7 +488,7 @@ def development_setup(recipe_dir: str, *args, **kwargs) -> None:
     # development versions are used.
     dev_packages = find_dev_packages(verbose=None if verbose is None or verbose else False)
     if dev_packages:
-        logger.info('Uninstall packages linked with `conda develop`:\n', '\n'.join(dev_packages))
+        logger.info('Uninstall packages linked with `conda develop`:\n%s', '\n'.join(dev_packages))
         conda_exec('uninstall', '-y', '--force', *dev_packages, verbose=verbose)
 
 

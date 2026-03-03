@@ -70,17 +70,20 @@ def with_loop(func: Callable[..., Awaitable[Any]]) -> Callable[..., Any]:
             logger.debug('Execute new loop in background thread.')
             finished = threading.Event()
 
-            async def run(generator: Awaitable[Any]) -> None:
-                loop = ensure_event_loop()
+            def run(generator: Awaitable[Any]) -> None:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
                 try:
-                    result = await generator
+                    result = loop.run_until_complete(generator)
                 except Exception as e:
                     finished.result = None
                     finished.error = e
                 else:
                     finished.result = result
                     finished.error = None
-                finished.set()
+                finally:
+                    loop.close()
+                    finished.set()
 
             thread = threading.Thread(target=run, args=(func(*args, **kwargs), ))
             thread.daemon = True

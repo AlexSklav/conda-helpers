@@ -114,12 +114,10 @@ def conda_exec_memoize(*args, **kwargs) -> str:
         kwargs['__git_revisions__'] = __git_revisions__
         if verbose:
             for git_dir_i, describe_i, head_i in __git_revisions__:
-                print(_C.Fore.MAGENTA + '  git source:',
-                      (_C.Fore.WHITE + '{}@'.format(git_dir_i.name)) +
-                      (_C.Fore.LIGHTGREEN_EX + '{}'.format(describe_i
-                                                           .decode('utf8'))),
-                      (_C.Fore.LIGHTCYAN_EX + '({})'.format(head_i[:8]
-                                                            .decode('utf8'))),
+                print(f'{_C.Fore.MAGENTA}  git source:',
+                      f'{_C.Fore.WHITE}{git_dir_i.name}@'
+                      f'{_C.Fore.LIGHTGREEN_EX}{describe_i.decode("utf8")}',
+                      f'{_C.Fore.LIGHTCYAN_EX}({head_i[:8].decode("utf8")})',
                       file=sys.stderr)
         kwargs['__git_revisions__'] = __git_revisions__
 
@@ -132,7 +130,7 @@ def conda_exec_memoize(*args, **kwargs) -> str:
             # Delete cached output file.
             ph.path(output_dir).joinpath('output.pkl').remove()
             if verbose:
-                print(_C.Fore.RED + 'Deleted cached result (`--force` was '
+                print(f'{_C.Fore.RED}Deleted cached result (`--force` was '
                       'specified.)', file=sys.stderr)
             cached = False
         else:
@@ -142,17 +140,17 @@ def conda_exec_memoize(*args, **kwargs) -> str:
         cached = False
 
     if verbose:
-        print(_C.Fore.MAGENTA + 'Command:', _C.Fore.WHITE +
-              sp.list2cmdline(args), file=sys.stderr)
+        print(f'{_C.Fore.MAGENTA}Command:', f'{_C.Fore.WHITE}'
+              f'{sp.list2cmdline(args)}', file=sys.stderr)
         if cached:
-            print(_C.Fore.MAGENTA + 'Reusing cached result...',
+            print(f'{_C.Fore.MAGENTA}Reusing cached result...',
                   file=sys.stderr)
         else:
-            print(_C.Fore.MAGENTA + 'Executing function (no cache found)...',
+            print(f'{_C.Fore.MAGENTA}Executing function (no cache found)...',
                   file=sys.stderr)
 
     if verbose:
-        print(_C.Fore.MAGENTA + '\nOutput\n======', file=sys.stderr)
+        print(f'{_C.Fore.MAGENTA}\nOutput\n======', file=sys.stderr)
 
     # **Note: `conda_exec` is created dynamically in `main()` function to
     # use a dynamically-specified memoize cache directory.**
@@ -203,15 +201,15 @@ def main(args: Optional[List[str]] = None) -> None:
 
     if args.verbose:
         if args.cache_dir == '-':
-            print(_C.Fore.MAGENTA + 'Cache disabled.', file=sys.stderr)
+            print(f'{_C.Fore.MAGENTA}Cache disabled.', file=sys.stderr)
             args.cache_dir = None
         elif not args.cache_dir.isdir():
-            print(_C.Fore.MAGENTA + 'Creating cache dir:',
-                  _C.Fore.WHITE + args.cache_dir.realpath(), file=sys.stderr)
+            print(f'{_C.Fore.MAGENTA}Creating cache dir:',
+                  f'{_C.Fore.WHITE}{args.cache_dir.realpath()}', file=sys.stderr)
             args.cache_dir = args.cache_dir.realpath()
         else:
-            print(_C.Fore.MAGENTA + 'Using cache dir:',
-                  _C.Fore.WHITE + args.cache_dir.realpath(), file=sys.stderr)
+            print(f'{_C.Fore.MAGENTA}Using cache dir:',
+                  f'{_C.Fore.WHITE}{args.cache_dir.realpath()}', file=sys.stderr)
             args.cache_dir = args.cache_dir.realpath()
 
     memory = jl.Memory(cachedir=args.cache_dir, verbose=0)
@@ -228,7 +226,7 @@ def main(args: Optional[List[str]] = None) -> None:
 
         if args.verbose:
             exe_time = (end - start)
-            print(_C.Fore.MAGENTA + '\nExecution time: %s' % exe_time,
+            print(_C.Fore.MAGENTA + f'\nExecution time: {exe_time}',
                   file=sys.stderr)
     finally:
         print(_C.Style.RESET_ALL, end='')

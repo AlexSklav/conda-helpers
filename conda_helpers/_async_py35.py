@@ -72,10 +72,10 @@ async def run_command(cmd: str, *args, **kwargs) -> Tuple[int, str, str]:
 
     if verbose is None:
         # Display status while executing command.
-        status_future = asyncio.ensure_future(display_status())
+        status_future = asyncio.create_task(display_status())
 
-    await asyncio.wait([_read_stream(process.stdout, partial(dump, stdout_), buffer_size=buffer_size),
-                        _read_stream(process.stderr, partial(dump, stderr_), buffer_size=buffer_size)])
+    await asyncio.gather(_read_stream(process.stdout, partial(dump, stdout_), buffer_size=buffer_size),
+                         _read_stream(process.stderr, partial(dump, stderr_), buffer_size=buffer_size))
 
     # Notify that command has completed execution.
     cmd_finished.set()
